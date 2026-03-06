@@ -11,6 +11,7 @@ final class GameRenderer {
     private let boardContainer = SKNode()
     private let boardNode = SKShapeNode()
     private let obstacleLayer = SKNode()
+    private let dynamicObstacleLayer = SKNode()
     private let snakeLayer = SKNode()
     private let fruitLayer = SKNode()
     private let hudLayer = SKNode()
@@ -44,6 +45,7 @@ final class GameRenderer {
         scene.addChild(boardContainer)
         boardContainer.addChild(boardNode)
         boardContainer.addChild(obstacleLayer)
+        boardContainer.addChild(dynamicObstacleLayer)
         boardContainer.addChild(fruitLayer)
         boardContainer.addChild(snakeLayer)
         scene.addChild(hudLayer)
@@ -135,6 +137,7 @@ final class GameRenderer {
 
     func render(snapshot: GameSnapshot, mode: SceneMode) {
         renderSnake(snapshot.snake)
+        renderDynamicObstacles(snapshot.dynamicObstacle)
         renderFruit(position: snapshot.fruitPosition, fruit: snapshot.fruit)
         updateHUD(snapshot)
         updateOverlay(snapshot: snapshot, mode: mode)
@@ -153,6 +156,7 @@ final class GameRenderer {
 
     private func renderBoard(for level: LevelDefinition) {
         obstacleLayer.removeAllChildren()
+        dynamicObstacleLayer.removeAllChildren()
         snakeLayer.removeAllChildren()
         fruitLayer.removeAllChildren()
 
@@ -222,6 +226,48 @@ final class GameRenderer {
                 rightEye.position = CGPoint(x: eyeOffset, y: eyeOffset)
                 node.addChild(rightEye)
             }
+        }
+    }
+
+    private func renderDynamicObstacles(_ snapshot: DynamicObstacleSnapshot?) {
+        dynamicObstacleLayer.removeAllChildren()
+
+        guard let snapshot else {
+            return
+        }
+
+        for obstaclePoint in snapshot.points {
+            let node = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.84, height: cellSize * 0.84),
+                cornerRadius: cellSize * 0.18
+            )
+            node.position = point(for: obstaclePoint)
+
+            switch snapshot.style {
+            case .sweeper:
+                node.fillColor = SKColor(calibratedRed: 0.96, green: 0.50, blue: 0.19, alpha: 1.0)
+                node.strokeColor = SKColor(calibratedRed: 1.0, green: 0.85, blue: 0.52, alpha: 0.95)
+                node.run(.repeatForever(.sequence([
+                    .fadeAlpha(to: 0.65, duration: 0.22),
+                    .fadeAlpha(to: 1.0, duration: 0.22)
+                ])))
+            case .gate:
+                node.fillColor = SKColor(calibratedRed: 0.28, green: 0.76, blue: 0.98, alpha: 1.0)
+                node.strokeColor = SKColor(calibratedWhite: 1.0, alpha: 0.92)
+                node.run(.repeatForever(.sequence([
+                    .group([
+                        .scale(to: 1.06, duration: 0.32),
+                        .fadeAlpha(to: 0.72, duration: 0.32)
+                    ]),
+                    .group([
+                        .scale(to: 0.96, duration: 0.32),
+                        .fadeAlpha(to: 1.0, duration: 0.32)
+                    ])
+                ])))
+            }
+
+            node.lineWidth = 1.6
+            dynamicObstacleLayer.addChild(node)
         }
     }
 
@@ -300,7 +346,8 @@ final class GameRenderer {
 
         statusLabel.text = snapshot.statusText
         statusLabel.alpha = snapshot.isGameOver ? 1.0 : 0.95
-        hintLabel.text = snapshot.hintText
+        let mechanic = snapshot.mechanicText.map { " · \($0)" } ?? ""
+        hintLabel.text = snapshot.hintText + mechanic
         hintLabel.alpha = snapshot.isGameOver ? 1.0 : 0.8
     }
 
@@ -314,7 +361,8 @@ final class GameRenderer {
             overlayLayer.alpha = 1
             overlayTitle.text = "贪吃蛇"
             overlaySubtitle.text = "随机关卡: \(snapshot.level.name)"
-            overlayMeta.text = "空格开始  ·  P 暂停  ·  方向键 / WASD 移动"
+            let mechanic = snapshot.mechanicText.map { "\n\($0)" } ?? ""
+            overlayMeta.text = "空格开始  ·  P 暂停  ·  方向键 / WASD 移动\(mechanic)"
         case .paused:
             overlayLayer.isHidden = false
             overlayLayer.alpha = 1

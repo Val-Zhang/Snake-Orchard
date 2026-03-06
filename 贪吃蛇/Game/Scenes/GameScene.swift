@@ -15,7 +15,7 @@ final class GameScene: SKScene {
     private let audioController = GameAudioController()
 
     private var engine = SnakeGameEngine(
-        level: LevelDefinition(name: "初始化", columns: 20, rows: 14, tickDuration: 0.18, obstacles: [])
+        level: LevelDefinition(name: "初始化", columns: 20, rows: 14, tickDuration: 0.18, obstacles: [], dynamicMechanic: nil)
     )
     private var lastUpdateTime: TimeInterval = 0
     private var timeAccumulator: TimeInterval = 0

@@ -195,17 +195,107 @@ struct FruitDefinition {
     }
 }
 
+enum DynamicObstacleStyle {
+    case sweeper
+    case gate
+}
+
+struct DynamicObstacleSnapshot {
+    let points: [GridPoint]
+    let style: DynamicObstacleStyle
+}
+
+struct SweeperDefinition: Equatable {
+    let row: Int
+    let minX: Int
+    let maxX: Int
+    let length: Int
+
+    func points(at tick: Int) -> [GridPoint] {
+        let startPositions = max(1, maxX - minX - length + 2)
+        let period = startPositions > 1 ? (startPositions - 1) * 2 : 1
+        let phase = tick % period
+        let reflected = phase < startPositions ? phase : (period - phase)
+        let startX = minX + reflected
+
+        return (0 ..< length).map { GridPoint(x: startX + $0, y: row) }
+    }
+
+    func statusText(at tick: Int) -> String {
+        let startPositions = max(1, maxX - minX - length + 2)
+        if startPositions == 1 {
+            return "横扫机关: 固定封锁第 \(row + 1) 行"
+        }
+
+        let period = (startPositions - 1) * 2
+        let phase = tick % period
+        let movingRight = phase < (startPositions - 1)
+        return movingRight
+            ? "横扫机关: 第 \(row + 1) 行向右推进"
+            : "横扫机关: 第 \(row + 1) 行向左回扫"
+    }
+}
+
+struct PulseGateDefinition: Equatable {
+    let closedPoints: [GridPoint]
+    let closedDuration: Int
+    let openDuration: Int
+
+    func activePoints(at tick: Int) -> [GridPoint] {
+        let cycle = max(1, closedDuration + openDuration)
+        let phase = tick % cycle
+        return phase < closedDuration ? closedPoints : []
+    }
+
+    func statusText(at tick: Int) -> String {
+        let cycle = max(1, closedDuration + openDuration)
+        let phase = tick % cycle
+        if phase < closedDuration {
+            let remaining = closedDuration - phase
+            return "中央闸门: 封闭中，\(remaining) 步后开启"
+        } else {
+            let remaining = cycle - phase
+            return "中央闸门: 开启中，\(remaining) 步后闭合"
+        }
+    }
+}
+
+enum DynamicMechanicDefinition: Equatable {
+    case sweeper(SweeperDefinition)
+    case pulseGate(PulseGateDefinition)
+
+    func snapshot(at tick: Int) -> DynamicObstacleSnapshot {
+        switch self {
+        case .sweeper(let definition):
+            return DynamicObstacleSnapshot(points: definition.points(at: tick), style: .sweeper)
+        case .pulseGate(let definition):
+            return DynamicObstacleSnapshot(points: definition.activePoints(at: tick), style: .gate)
+        }
+    }
+
+    func statusText(at tick: Int) -> String {
+        switch self {
+        case .sweeper(let definition):
+            return definition.statusText(at: tick)
+        case .pulseGate(let definition):
+            return definition.statusText(at: tick)
+        }
+    }
+}
+
 struct LevelDefinition: Equatable {
     let name: String
     let columns: Int
     let rows: Int
     let tickDuration: TimeInterval
     let obstacles: Set<GridPoint>
+    let dynamicMechanic: DynamicMechanicDefinition?
 }
 
 struct GameSnapshot {
     let level: LevelDefinition
     let snake: [GridPoint]
+    let dynamicObstacle: DynamicObstacleSnapshot?
     let fruitPosition: GridPoint?
     let fruit: FruitDefinition?
     let score: Int
@@ -215,6 +305,7 @@ struct GameSnapshot {
     let statusText: String
     let hintText: String
     let activeEffectText: String?
+    let mechanicText: String?
 }
 
 enum SceneMode {
