@@ -7,12 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		5DAC0C4D2F5B08DE005B1F22 /* 贪吃蛇.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "贪吃蛇.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DAC0C4D2F5B08DE005B1F22 /* Snake Orchard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Snake Orchard.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		5DAC0C4F2F5B08DE005B1F22 /* 贪吃蛇 */ = {
+		5DAC0C4F2F5B08DE005B1F22 /* Snake Orchard */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "Snake Orchard";
 			path = "贪吃蛇";
 			sourceTree = "<group>";
 		};
@@ -32,7 +33,7 @@
 		5DAC0C442F5B08DE005B1F22 = {
 			isa = PBXGroup;
 			children = (
-				5DAC0C4F2F5B08DE005B1F22 /* 贪吃蛇 */,
+				5DAC0C4F2F5B08DE005B1F22 /* Snake Orchard */,
 				5DAC0C4E2F5B08DE005B1F22 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,7 +41,7 @@
 		5DAC0C4E2F5B08DE005B1F22 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5DAC0C4D2F5B08DE005B1F22 /* 贪吃蛇.app */,
+				5DAC0C4D2F5B08DE005B1F22 /* Snake Orchard.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +49,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		5DAC0C4C2F5B08DE005B1F22 /* 贪吃蛇 */ = {
+		5DAC0C4C2F5B08DE005B1F22 /* Snake Orchard */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 5DAC0C612F5B08DF005B1F22 /* Build configuration list for PBXNativeTarget "贪吃蛇" */;
+			buildConfigurationList = 5DAC0C612F5B08DF005B1F22 /* Build configuration list for PBXNativeTarget "Snake Orchard" */;
 			buildPhases = (
 				5DAC0C492F5B08DE005B1F22 /* Sources */,
 				5DAC0C4A2F5B08DE005B1F22 /* Frameworks */,
@@ -61,13 +62,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				5DAC0C4F2F5B08DE005B1F22 /* 贪吃蛇 */,
+				5DAC0C4F2F5B08DE005B1F22 /* Snake Orchard */,
 			);
-			name = "贪吃蛇";
+			name = "Snake Orchard";
 			packageProductDependencies = (
 			);
-			productName = "贪吃蛇";
-			productReference = 5DAC0C4D2F5B08DE005B1F22 /* 贪吃蛇.app */;
+			productName = "Snake Orchard";
+			productReference = 5DAC0C4D2F5B08DE005B1F22 /* Snake Orchard.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +86,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 5DAC0C482F5B08DE005B1F22 /* Build configuration list for PBXProject "贪吃蛇" */;
+			buildConfigurationList = 5DAC0C482F5B08DE005B1F22 /* Build configuration list for PBXProject "Snake Orchard" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +100,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				5DAC0C4C2F5B08DE005B1F22 /* 贪吃蛇 */,
+				5DAC0C4C2F5B08DE005B1F22 /* Snake Orchard */,
 			);
 		};
 /* End PBXProject section */
@@ -267,8 +268,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "pinglan.zw.---";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = "Snake Orchard";
+				INFOPLIST_KEY_CFBundleName = "Snake Orchard";
+				PRODUCT_BUNDLE_IDENTIFIER = "pinglan.zw.snakeorchard";
+				PRODUCT_NAME = "Snake Orchard";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -301,8 +304,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "pinglan.zw.---";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = "Snake Orchard";
+				INFOPLIST_KEY_CFBundleName = "Snake Orchard";
+				PRODUCT_BUNDLE_IDENTIFIER = "pinglan.zw.snakeorchard";
+				PRODUCT_NAME = "Snake Orchard";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -316,7 +321,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		5DAC0C482F5B08DE005B1F22 /* Build configuration list for PBXProject "贪吃蛇" */ = {
+		5DAC0C482F5B08DE005B1F22 /* Build configuration list for PBXProject "Snake Orchard" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5DAC0C5F2F5B08DF005B1F22 /* Debug */,
@@ -325,7 +330,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		5DAC0C612F5B08DF005B1F22 /* Build configuration list for PBXNativeTarget "贪吃蛇" */ = {
+		5DAC0C612F5B08DF005B1F22 /* Build configuration list for PBXNativeTarget "Snake Orchard" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5DAC0C622F5B08DF005B1F22 /* Debug */,
