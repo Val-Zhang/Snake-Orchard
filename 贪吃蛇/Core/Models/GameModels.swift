@@ -414,6 +414,20 @@ struct AchievementDefinition: Equatable {
     let detail: String
     let symbol: String
     let category: AchievementCategory
+    let targetValue: Int
+}
+
+struct AchievementProgress: Equatable {
+    let current: Int
+    let target: Int
+
+    var isUnlocked: Bool {
+        current >= target
+    }
+
+    var summaryText: String {
+        "\(min(current, target))/\(target)"
+    }
 }
 
 struct GameRunStats {
@@ -682,16 +696,16 @@ enum CodexCatalog {
 
 enum AchievementCatalog {
     static let all: [AchievementDefinition] = [
-        AchievementDefinition(id: .firstFruit, title: "第一口", detail: "第一次吃到水果", symbol: "🍎", category: .collection),
-        AchievementDefinition(id: .pomeloCollector, title: "柚子专家", detail: "单局吃到 3 个柚子", symbol: "🍊", category: .collection),
-        AchievementDefinition(id: .goldenHunter, title: "金彩猎手", detail: "单局吃到 2 个金彩水果", symbol: "✦", category: .challenge),
-        AchievementDefinition(id: .longTail, title: "长尾进化", detail: "蛇身长度达到 18", symbol: "🐍", category: .mastery),
-        AchievementDefinition(id: .missionStarter, title: "任务达人", detail: "完成任意一局任务", symbol: "✓", category: .challenge),
-        AchievementDefinition(id: .hazardRunner, title: "机关舞者", detail: "在机关关卡拿到 80 分", symbol: "⚙", category: .mastery),
-        AchievementDefinition(id: .rainbowPicnic, title: "彩虹野餐", detail: "单局吃到全部 5 种水果", symbol: "🌈", category: .collection),
-        AchievementDefinition(id: .speedster, title: "喷射车手", detail: "单局使用 1 次加速", symbol: "⚡", category: .mastery),
-        AchievementDefinition(id: .poopTrail, title: "便便尾迹", detail: "单局甩出 3 团便便残留", symbol: "💩", category: .challenge),
-        AchievementDefinition(id: .trainCollector, title: "列车长", detail: "极简模式下收集 4 种水果车厢", symbol: "🚂", category: .collection)
+        AchievementDefinition(id: .firstFruit, title: "第一口", detail: "第一次吃到水果", symbol: "🍎", category: .collection, targetValue: 1),
+        AchievementDefinition(id: .pomeloCollector, title: "柚子专家", detail: "单局吃到 3 个柚子", symbol: "🍊", category: .collection, targetValue: 3),
+        AchievementDefinition(id: .goldenHunter, title: "金彩猎手", detail: "单局吃到 2 个金彩水果", symbol: "✦", category: .challenge, targetValue: 2),
+        AchievementDefinition(id: .longTail, title: "长尾进化", detail: "蛇身长度达到 18", symbol: "🐍", category: .mastery, targetValue: 18),
+        AchievementDefinition(id: .missionStarter, title: "任务达人", detail: "完成任意一局任务", symbol: "✓", category: .challenge, targetValue: 1),
+        AchievementDefinition(id: .hazardRunner, title: "机关舞者", detail: "在机关关卡拿到 80 分", symbol: "⚙", category: .mastery, targetValue: 80),
+        AchievementDefinition(id: .rainbowPicnic, title: "彩虹野餐", detail: "单局吃到全部 5 种水果", symbol: "🌈", category: .collection, targetValue: 5),
+        AchievementDefinition(id: .speedster, title: "喷射车手", detail: "单局使用 1 次加速", symbol: "⚡", category: .mastery, targetValue: 1),
+        AchievementDefinition(id: .poopTrail, title: "便便尾迹", detail: "单局甩出 3 团便便残留", symbol: "💩", category: .challenge, targetValue: 3),
+        AchievementDefinition(id: .trainCollector, title: "列车长", detail: "极简模式下收集 4 种水果车厢", symbol: "🚂", category: .collection, targetValue: 4)
     ]
 
     static func definition(for id: AchievementID) -> AchievementDefinition? {
@@ -699,40 +713,37 @@ enum AchievementCatalog {
     }
 
     static func unlockedAchievements(snapshot: GameSnapshot, runStats: GameRunStats) -> [AchievementDefinition] {
-        var unlocked: [AchievementDefinition] = []
+        all.filter { progress(for: $0.id, snapshot: snapshot, runStats: runStats).isUnlocked }
+    }
 
-        if runStats.totalFruitsEaten > 0 {
-            append(.firstFruit, to: &unlocked)
-        }
-        if runStats.fruits(for: .pomelo) >= 3 {
-            append(.pomeloCollector, to: &unlocked)
-        }
-        if runStats.fruits(with: .golden) >= 2 {
-            append(.goldenHunter, to: &unlocked)
-        }
-        if snapshot.snake.count >= 18 {
-            append(.longTail, to: &unlocked)
-        }
-        if runStats.missionCompleted {
-            append(.missionStarter, to: &unlocked)
-        }
-        if snapshot.level.dynamicMechanic != nil && snapshot.score >= 80 {
-            append(.hazardRunner, to: &unlocked)
-        }
-        if runStats.uniqueFruitKindsEaten >= FruitKind.allCases.count {
-            append(.rainbowPicnic, to: &unlocked)
-        }
-        if runStats.boostUses >= 1 {
-            append(.speedster, to: &unlocked)
-        }
-        if runStats.poopDrops >= 3 {
-            append(.poopTrail, to: &unlocked)
-        }
-        if snapshot.isSimpleModeEnabled && runStats.uniqueFruitKindsEaten >= 4 {
-            append(.trainCollector, to: &unlocked)
+    static func progress(for id: AchievementID, snapshot: GameSnapshot, runStats: GameRunStats) -> AchievementProgress {
+        let target = definition(for: id)?.targetValue ?? 1
+        let current: Int
+
+        switch id {
+        case .firstFruit:
+            current = runStats.totalFruitsEaten
+        case .pomeloCollector:
+            current = runStats.fruits(for: .pomelo)
+        case .goldenHunter:
+            current = runStats.fruits(with: .golden)
+        case .longTail:
+            current = snapshot.snake.count
+        case .missionStarter:
+            current = runStats.missionCompleted ? 1 : 0
+        case .hazardRunner:
+            current = snapshot.level.dynamicMechanic != nil ? snapshot.score : 0
+        case .rainbowPicnic:
+            current = runStats.uniqueFruitKindsEaten
+        case .speedster:
+            current = runStats.boostUses
+        case .poopTrail:
+            current = runStats.poopDrops
+        case .trainCollector:
+            current = snapshot.isSimpleModeEnabled ? runStats.uniqueFruitKindsEaten : 0
         }
 
-        return unlocked
+        return AchievementProgress(current: current, target: target)
     }
 
     private static func append(_ id: AchievementID, to achievements: inout [AchievementDefinition]) {
@@ -976,6 +987,78 @@ struct BoostStatusSnapshot {
     let hasEnoughLength: Bool
 }
 
+enum VisualTheme: String, CaseIterable {
+    case orchard
+    case sunset
+    case mint
+    case neon
+
+    var title: String {
+        switch self {
+        case .orchard:
+            return "果园"
+        case .sunset:
+            return "落日"
+        case .mint:
+            return "薄荷"
+        case .neon:
+            return "霓虹"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .orchard:
+            return "🍃"
+        case .sunset:
+            return "🌇"
+        case .mint:
+            return "🍬"
+        case .neon:
+            return "🌌"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .orchard:
+            return "经典果园涂装，清新明亮。"
+        case .sunset:
+            return "暖橙落日列车，像傍晚巡游。"
+        case .mint:
+            return "薄荷糖配色，车头像糖果小火车。"
+        case .neon:
+            return "霓虹夜行列车，灯带更醒目。"
+        }
+    }
+
+    var unlockHint: String {
+        switch self {
+        case .orchard:
+            return "默认可用"
+        case .sunset:
+            return "解锁条件: 金彩猎手"
+        case .mint:
+            return "解锁条件: 列车长"
+        case .neon:
+            return "解锁条件: 机关舞者"
+        }
+    }
+
+    var unlockAchievementID: AchievementID? {
+        switch self {
+        case .orchard:
+            return nil
+        case .sunset:
+            return .goldenHunter
+        case .mint:
+            return .trainCollector
+        case .neon:
+            return .hazardRunner
+        }
+    }
+}
+
 enum SpeedPreset: String, CaseIterable {
     case relaxed
     case standard
@@ -1009,12 +1092,14 @@ struct GameSettings: Equatable {
     var musicEnabled: Bool
     var speedPreset: SpeedPreset
     var simpleModeEnabled: Bool
+    var visualTheme: VisualTheme
 
     static let `default` = GameSettings(
         soundEnabled: true,
         musicEnabled: true,
         speedPreset: .standard,
-        simpleModeEnabled: false
+        simpleModeEnabled: false,
+        visualTheme: .orchard
     )
 }
 
@@ -1052,6 +1137,7 @@ enum SettingsOption: CaseIterable {
     case music
     case simpleMode
     case speed
+    case theme
     case back
 
     var title: String {
@@ -1064,6 +1150,8 @@ enum SettingsOption: CaseIterable {
             return "模式"
         case .speed:
             return "速度"
+        case .theme:
+            return "皮肤"
         case .back:
             return "返回主菜单"
         }
@@ -1111,11 +1199,18 @@ struct OverlayMenuItem {
     let isDimmed: Bool
 }
 
+struct OverlayTabItem {
+    let title: String
+    let icon: String?
+    let isSelected: Bool
+}
+
 struct OverlayMenuState {
     let title: String
     let subtitle: String
     let detail: String?
     let items: [OverlayMenuItem]
+    let tabs: [OverlayTabItem]
     let selectedIndex: Int?
     let footer: String
     let layout: OverlayMenuLayout
@@ -1145,6 +1240,7 @@ enum SceneMode {
     case mainMenu
     case achievements
     case codex
+    case codexDetail
     case help
     case ready
     case playing
@@ -1153,9 +1249,21 @@ enum SceneMode {
     case settings
 }
 
+enum ThemeCatalog {
+    static func unlockedThemes(for achievementIDs: Set<AchievementID>) -> [VisualTheme] {
+        VisualTheme.allCases.filter { theme in
+            guard let unlockAchievementID = theme.unlockAchievementID else {
+                return true
+            }
+            return achievementIDs.contains(unlockAchievementID)
+        }
+    }
+}
+
 enum GameEvent {
     case ateFruit(fruit: FruitDefinition, at: GridPoint, points: Int)
     case comboAdvanced(count: Int, bonus: Int)
+    case codexDiscovered(CodexEntryDefinition)
     case fruitExpired(FruitDefinition)
     case bombTriggered
     case boostActivated
@@ -1165,4 +1273,5 @@ enum GameEvent {
     case highScoreUpdated(Int)
     case missionCompleted(MissionDefinition)
     case achievementUnlocked(AchievementDefinition)
+    case themeUnlocked(VisualTheme)
 }

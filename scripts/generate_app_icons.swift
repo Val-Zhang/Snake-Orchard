@@ -23,6 +23,7 @@ let fileManager = FileManager.default
 let currentDirectory = URL(fileURLWithPath: fileManager.currentDirectoryPath)
 let outputDirectory = currentDirectory
     .appendingPathComponent("贪吃蛇")
+    .appendingPathComponent("Resources")
     .appendingPathComponent("Assets.xcassets")
     .appendingPathComponent("AppIcon.appiconset")
 
@@ -39,175 +40,246 @@ func drawBackground(in rect: CGRect) {
     path.addClip()
 
     let gradient = NSGradient(colors: [
-        makeColor(red: 9, green: 21, blue: 34),
-        makeColor(red: 12, green: 62, blue: 58),
-        makeColor(red: 35, green: 120, blue: 80)
+        makeColor(red: 255, green: 244, blue: 203),
+        makeColor(red: 255, green: 214, blue: 160),
+        makeColor(red: 255, green: 173, blue: 129)
     ])!
-    gradient.draw(in: path, angle: -45)
+    gradient.draw(in: path, angle: -35)
 
     let glowRect = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
     let glowPath = roundedRect(glowRect, radius: rect.width * 0.20)
-    makeColor(red: 255, green: 255, blue: 255, alpha: 0.05).setFill()
+    makeColor(red: 255, green: 255, blue: 255, alpha: 0.16).setFill()
     glowPath.fill()
 
     let vignette = NSGradient(colors: [
         makeColor(red: 0, green: 0, blue: 0, alpha: 0.00),
-        makeColor(red: 0, green: 0, blue: 0, alpha: 0.26)
+        makeColor(red: 165, green: 92, blue: 47, alpha: 0.18)
     ])!
-    vignette.draw(in: path, relativeCenterPosition: NSPoint(x: 0.0, y: 0.4))
+    vignette.draw(in: path, relativeCenterPosition: NSPoint(x: 0.1, y: 0.35))
 
-    makeColor(red: 255, green: 255, blue: 255, alpha: 0.12).setStroke()
+    makeColor(red: 255, green: 255, blue: 255, alpha: 0.30).setStroke()
     path.lineWidth = rect.width * 0.018
     path.stroke()
 }
 
-func drawGrid(in rect: CGRect) {
-    let gridPath = NSBezierPath()
-    gridPath.lineWidth = max(1, rect.width * 0.006)
-
-    let columns = 5
-    let rows = 5
-    for index in 1..<columns {
-        let x = rect.minX + CGFloat(index) * rect.width / CGFloat(columns)
-        gridPath.move(to: CGPoint(x: x, y: rect.minY))
-        gridPath.line(to: CGPoint(x: x, y: rect.maxY))
-    }
-    for index in 1..<rows {
-        let y = rect.minY + CGFloat(index) * rect.height / CGFloat(rows)
-        gridPath.move(to: CGPoint(x: rect.minX, y: y))
-        gridPath.line(to: CGPoint(x: rect.maxX, y: y))
-    }
-
-    makeColor(red: 255, green: 255, blue: 255, alpha: 0.07).setStroke()
-    gridPath.stroke()
+func drawShadowOval(in rect: CGRect) {
+    let shadowRect = CGRect(
+        x: rect.minX + rect.width * 0.22,
+        y: rect.minY + rect.height * 0.20,
+        width: rect.width * 0.56,
+        height: rect.height * 0.11
+    )
+    let shadow = NSBezierPath(ovalIn: shadowRect)
+    let shadowGradient = NSGradient(colors: [
+        makeColor(red: 117, green: 72, blue: 37, alpha: 0.28),
+        makeColor(red: 117, green: 72, blue: 37, alpha: 0.02)
+    ])!
+    shadowGradient.draw(in: shadow, angle: 90)
 }
 
-func drawSnake(in rect: CGRect) {
-    let body = NSBezierPath()
-    body.move(to: CGPoint(x: rect.minX + rect.width * 0.24, y: rect.minY + rect.height * 0.22))
-    body.curve(
-        to: CGPoint(x: rect.minX + rect.width * 0.70, y: rect.minY + rect.height * 0.74),
-        controlPoint1: CGPoint(x: rect.minX + rect.width * 0.16, y: rect.minY + rect.height * 0.54),
-        controlPoint2: CGPoint(x: rect.minX + rect.width * 0.46, y: rect.minY + rect.height * 0.95)
-    )
-    body.curve(
-        to: CGPoint(x: rect.minX + rect.width * 0.52, y: rect.minY + rect.height * 0.56),
-        controlPoint1: CGPoint(x: rect.minX + rect.width * 0.82, y: rect.minY + rect.height * 0.70),
-        controlPoint2: CGPoint(x: rect.minX + rect.width * 0.70, y: rect.minY + rect.height * 0.56)
-    )
+func drawTrainSnake(in rect: CGRect) {
+    let outline = makeColor(red: 56, green: 123, blue: 72, alpha: 0.22)
+    let bodyColor = makeColor(red: 102, green: 215, blue: 116)
+    let bodyHighlight = makeColor(red: 171, green: 244, blue: 173)
+    let stripeColor = makeColor(red: 219, green: 255, blue: 198, alpha: 0.95)
+    let darkGreen = makeColor(red: 48, green: 135, blue: 79)
+    let wheelGreen = makeColor(red: 55, green: 120, blue: 74)
+    let cream = makeColor(red: 255, green: 247, blue: 227)
+    let blush = makeColor(red: 255, green: 145, blue: 144, alpha: 0.65)
 
-    body.lineCapStyle = .round
-    body.lineJoinStyle = .round
-    body.lineWidth = rect.width * 0.14
-    makeColor(red: 58, green: 193, blue: 97).setStroke()
-    body.stroke()
+    let tail = NSBezierPath()
+    tail.move(to: CGPoint(x: rect.minX + rect.width * 0.32, y: rect.minY + rect.height * 0.48))
+    tail.curve(
+        to: CGPoint(x: rect.minX + rect.width * 0.17, y: rect.minY + rect.height * 0.73),
+        controlPoint1: CGPoint(x: rect.minX + rect.width * 0.22, y: rect.minY + rect.height * 0.48),
+        controlPoint2: CGPoint(x: rect.minX + rect.width * 0.12, y: rect.minY + rect.height * 0.58)
+    )
+    tail.curve(
+        to: CGPoint(x: rect.minX + rect.width * 0.30, y: rect.minY + rect.height * 0.77),
+        controlPoint1: CGPoint(x: rect.minX + rect.width * 0.21, y: rect.minY + rect.height * 0.82),
+        controlPoint2: CGPoint(x: rect.minX + rect.width * 0.30, y: rect.minY + rect.height * 0.83)
+    )
+    tail.lineCapStyle = .round
+    tail.lineJoinStyle = .round
+    tail.lineWidth = rect.width * 0.12
+    outline.setStroke()
+    tail.stroke()
+    tail.lineWidth = rect.width * 0.10
+    bodyColor.setStroke()
+    tail.stroke()
+    tail.lineWidth = rect.width * 0.05
+    bodyHighlight.setStroke()
+    tail.stroke()
 
-    body.lineWidth = rect.width * 0.08
-    makeColor(red: 137, green: 245, blue: 159, alpha: 0.95).setStroke()
-    body.stroke()
+    let bodyRect = CGRect(
+        x: rect.minX + rect.width * 0.24,
+        y: rect.minY + rect.height * 0.31,
+        width: rect.width * 0.44,
+        height: rect.height * 0.23
+    )
+    let bodyPath = roundedRect(bodyRect, radius: rect.width * 0.10)
+    outline.setFill()
+    roundedRect(bodyRect.offsetBy(dx: 0, dy: -rect.height * 0.012), radius: rect.width * 0.10).fill()
+    bodyColor.setFill()
+    bodyPath.fill()
+
+    let stripeRect = CGRect(
+        x: bodyRect.minX + bodyRect.width * 0.10,
+        y: bodyRect.minY + bodyRect.height * 0.18,
+        width: bodyRect.width * 0.72,
+        height: bodyRect.height * 0.32
+    )
+    stripeColor.setFill()
+    roundedRect(stripeRect, radius: stripeRect.height * 0.48).fill()
+
+    let cabRect = CGRect(
+        x: rect.minX + rect.width * 0.18,
+        y: rect.minY + rect.height * 0.42,
+        width: rect.width * 0.19,
+        height: rect.height * 0.18
+    )
+    let cabPath = roundedRect(cabRect, radius: rect.width * 0.07)
+    outline.setFill()
+    roundedRect(cabRect.offsetBy(dx: 0, dy: -rect.height * 0.010), radius: rect.width * 0.07).fill()
+    darkGreen.setFill()
+    cabPath.fill()
+
+    let windowRect = CGRect(
+        x: cabRect.minX + cabRect.width * 0.18,
+        y: cabRect.minY + cabRect.height * 0.28,
+        width: cabRect.width * 0.46,
+        height: cabRect.height * 0.38
+    )
+    makeColor(red: 220, green: 247, blue: 255, alpha: 0.95).setFill()
+    roundedRect(windowRect, radius: windowRect.width * 0.24).fill()
+
+    let chimneyRect = CGRect(
+        x: bodyRect.minX + bodyRect.width * 0.22,
+        y: bodyRect.maxY - rect.height * 0.01,
+        width: rect.width * 0.08,
+        height: rect.height * 0.14
+    )
+    darkGreen.setFill()
+    roundedRect(chimneyRect, radius: rect.width * 0.03).fill()
+    let chimneyTop = CGRect(
+        x: chimneyRect.minX - rect.width * 0.015,
+        y: chimneyRect.maxY - rect.height * 0.02,
+        width: chimneyRect.width + rect.width * 0.03,
+        height: rect.height * 0.04
+    )
+    roundedRect(chimneyTop, radius: chimneyTop.height * 0.5).fill()
+
+    let puffCenter = CGPoint(x: chimneyRect.midX - rect.width * 0.02, y: chimneyTop.maxY + rect.height * 0.05)
+    let puff = NSBezierPath(ovalIn: CGRect(
+        x: puffCenter.x - rect.width * 0.045,
+        y: puffCenter.y - rect.width * 0.045,
+        width: rect.width * 0.09,
+        height: rect.width * 0.09
+    ))
+    makeColor(red: 255, green: 255, blue: 255, alpha: 0.65).setFill()
+    puff.fill()
 
     let headRect = CGRect(
         x: rect.minX + rect.width * 0.58,
-        y: rect.minY + rect.height * 0.64,
-        width: rect.width * 0.23,
-        height: rect.height * 0.18
+        y: rect.minY + rect.height * 0.34,
+        width: rect.width * 0.22,
+        height: rect.height * 0.19
     )
     let headPath = roundedRect(headRect, radius: rect.width * 0.09)
-    makeColor(red: 97, green: 235, blue: 118).setFill()
+    outline.setFill()
+    roundedRect(headRect.offsetBy(dx: 0, dy: -rect.height * 0.010), radius: rect.width * 0.09).fill()
+    bodyColor.setFill()
     headPath.fill()
 
-    makeColor(red: 22, green: 58, blue: 33, alpha: 0.35).setStroke()
-    headPath.lineWidth = rect.width * 0.012
-    headPath.stroke()
+    let snoutRect = CGRect(
+        x: headRect.maxX - rect.width * 0.06,
+        y: headRect.minY + headRect.height * 0.12,
+        width: rect.width * 0.08,
+        height: headRect.height * 0.48
+    )
+    bodyColor.setFill()
+    roundedRect(snoutRect, radius: snoutRect.width * 0.45).fill()
 
     let leftEye = NSBezierPath(ovalIn: CGRect(
         x: headRect.minX + headRect.width * 0.24,
-        y: headRect.minY + headRect.height * 0.54,
-        width: headRect.width * 0.12,
-        height: headRect.width * 0.12
+        y: headRect.minY + headRect.height * 0.56,
+        width: headRect.width * 0.11,
+        height: headRect.width * 0.11
     ))
     let rightEye = NSBezierPath(ovalIn: CGRect(
-        x: headRect.minX + headRect.width * 0.60,
-        y: headRect.minY + headRect.height * 0.54,
-        width: headRect.width * 0.12,
-        height: headRect.width * 0.12
+        x: headRect.minX + headRect.width * 0.56,
+        y: headRect.minY + headRect.height * 0.56,
+        width: headRect.width * 0.11,
+        height: headRect.width * 0.11
     ))
     NSColor.black.setFill()
     leftEye.fill()
     rightEye.fill()
 
-    let tongue = NSBezierPath()
-    tongue.move(to: CGPoint(x: headRect.maxX - rect.width * 0.006, y: headRect.midY - rect.height * 0.01))
-    tongue.line(to: CGPoint(x: headRect.maxX + rect.width * 0.07, y: headRect.midY + rect.height * 0.01))
-    tongue.lineCapStyle = .round
-    tongue.lineWidth = rect.width * 0.016
-    makeColor(red: 255, green: 91, blue: 112).setStroke()
-    tongue.stroke()
-}
-
-func drawApple(in rect: CGRect) {
-    let appleCenter = CGPoint(x: rect.minX + rect.width * 0.76, y: rect.minY + rect.height * 0.28)
-    let appleRadius = rect.width * 0.12
-
-    let leftLobe = NSBezierPath(ovalIn: CGRect(
-        x: appleCenter.x - appleRadius * 1.15,
-        y: appleCenter.y - appleRadius * 0.55,
-        width: appleRadius * 1.3,
-        height: appleRadius * 1.45
+    let leftCheek = NSBezierPath(ovalIn: CGRect(
+        x: headRect.minX + headRect.width * 0.16,
+        y: headRect.minY + headRect.height * 0.28,
+        width: headRect.width * 0.14,
+        height: headRect.width * 0.10
     ))
-    let rightLobe = NSBezierPath(ovalIn: CGRect(
-        x: appleCenter.x - appleRadius * 0.15,
-        y: appleCenter.y - appleRadius * 0.55,
-        width: appleRadius * 1.3,
-        height: appleRadius * 1.45
+    let rightCheek = NSBezierPath(ovalIn: CGRect(
+        x: headRect.minX + headRect.width * 0.66,
+        y: headRect.minY + headRect.height * 0.28,
+        width: headRect.width * 0.14,
+        height: headRect.width * 0.10
     ))
-    let bottom = NSBezierPath(ovalIn: CGRect(
-        x: appleCenter.x - appleRadius,
-        y: appleCenter.y - appleRadius * 0.90,
-        width: appleRadius * 2.0,
-        height: appleRadius * 1.7
-    ))
+    blush.setFill()
+    leftCheek.fill()
+    rightCheek.fill()
 
-    makeColor(red: 238, green: 69, blue: 72).setFill()
-    leftLobe.fill()
-    rightLobe.fill()
-    bottom.fill()
-
-    let highlight = NSBezierPath(ovalIn: CGRect(
-        x: appleCenter.x - appleRadius * 0.72,
-        y: appleCenter.y + appleRadius * 0.12,
-        width: appleRadius * 0.46,
-        height: appleRadius * 0.72
-    ))
-    makeColor(red: 255, green: 255, blue: 255, alpha: 0.28).setFill()
-    highlight.fill()
-
-    let stem = NSBezierPath()
-    stem.move(to: CGPoint(x: appleCenter.x + appleRadius * 0.02, y: appleCenter.y + appleRadius * 1.02))
-    stem.curve(
-        to: CGPoint(x: appleCenter.x + appleRadius * 0.18, y: appleCenter.y + appleRadius * 1.44),
-        controlPoint1: CGPoint(x: appleCenter.x + appleRadius * 0.02, y: appleCenter.y + appleRadius * 1.16),
-        controlPoint2: CGPoint(x: appleCenter.x + appleRadius * 0.12, y: appleCenter.y + appleRadius * 1.34)
+    let smile = NSBezierPath()
+    smile.move(to: CGPoint(x: headRect.minX + headRect.width * 0.38, y: headRect.minY + headRect.height * 0.30))
+    smile.curve(
+        to: CGPoint(x: headRect.minX + headRect.width * 0.62, y: headRect.minY + headRect.height * 0.30),
+        controlPoint1: CGPoint(x: headRect.minX + headRect.width * 0.44, y: headRect.minY + headRect.height * 0.20),
+        controlPoint2: CGPoint(x: headRect.minX + headRect.width * 0.56, y: headRect.minY + headRect.height * 0.20)
     )
-    stem.lineCapStyle = .round
-    stem.lineWidth = rect.width * 0.022
-    makeColor(red: 114, green: 70, blue: 35).setStroke()
-    stem.stroke()
+    smile.lineCapStyle = .round
+    smile.lineWidth = rect.width * 0.012
+    makeColor(red: 54, green: 112, blue: 68, alpha: 0.8).setStroke()
+    smile.stroke()
 
-    let leaf = NSBezierPath()
-    leaf.move(to: CGPoint(x: appleCenter.x + appleRadius * 0.12, y: appleCenter.y + appleRadius * 1.22))
-    leaf.curve(
-        to: CGPoint(x: appleCenter.x + appleRadius * 0.78, y: appleCenter.y + appleRadius * 1.02),
-        controlPoint1: CGPoint(x: appleCenter.x + appleRadius * 0.48, y: appleCenter.y + appleRadius * 1.52),
-        controlPoint2: CGPoint(x: appleCenter.x + appleRadius * 0.86, y: appleCenter.y + appleRadius * 1.22)
-    )
-    leaf.curve(
-        to: CGPoint(x: appleCenter.x + appleRadius * 0.12, y: appleCenter.y + appleRadius * 1.22),
-        controlPoint1: CGPoint(x: appleCenter.x + appleRadius * 0.54, y: appleCenter.y + appleRadius * 0.82),
-        controlPoint2: CGPoint(x: appleCenter.x + appleRadius * 0.24, y: appleCenter.y + appleRadius * 0.96)
-    )
-    makeColor(red: 59, green: 177, blue: 95).setFill()
-    leaf.fill()
+    let connector = NSBezierPath()
+    connector.move(to: CGPoint(x: bodyRect.maxX - rect.width * 0.01, y: bodyRect.midY + rect.height * 0.02))
+    connector.line(to: CGPoint(x: headRect.minX + rect.width * 0.01, y: headRect.midY + rect.height * 0.01))
+    connector.lineCapStyle = .round
+    connector.lineWidth = rect.width * 0.08
+    bodyColor.setStroke()
+    connector.stroke()
+    connector.lineWidth = rect.width * 0.038
+    bodyHighlight.setStroke()
+    connector.stroke()
+
+    let bumper = NSBezierPath()
+    bumper.move(to: CGPoint(x: headRect.maxX + rect.width * 0.005, y: headRect.minY + headRect.height * 0.16))
+    bumper.line(to: CGPoint(x: headRect.maxX + rect.width * 0.045, y: headRect.minY + headRect.height * 0.16))
+    bumper.lineCapStyle = .round
+    bumper.lineWidth = rect.width * 0.022
+    darkGreen.setStroke()
+    bumper.stroke()
+
+    for center in [
+        CGPoint(x: rect.minX + rect.width * 0.34, y: rect.minY + rect.height * 0.28),
+        CGPoint(x: rect.minX + rect.width * 0.54, y: rect.minY + rect.height * 0.28)
+    ] {
+        let outerRect = CGRect(
+            x: center.x - rect.width * 0.07,
+            y: center.y - rect.width * 0.07,
+            width: rect.width * 0.14,
+            height: rect.width * 0.14
+        )
+        wheelGreen.setFill()
+        NSBezierPath(ovalIn: outerRect).fill()
+
+        let innerRect = outerRect.insetBy(dx: rect.width * 0.032, dy: rect.width * 0.032)
+        cream.setFill()
+        NSBezierPath(ovalIn: innerRect).fill()
+    }
 }
 
 func renderIcon(size: Int) -> NSBitmapImageRep {
@@ -235,9 +307,8 @@ func renderIcon(size: Int) -> NSBitmapImageRep {
 
     let insetRect = rect.insetBy(dx: CGFloat(size) * 0.04, dy: CGFloat(size) * 0.04)
     drawBackground(in: insetRect)
-    drawGrid(in: insetRect.insetBy(dx: insetRect.width * 0.08, dy: insetRect.height * 0.08))
-    drawSnake(in: insetRect)
-    drawApple(in: insetRect)
+    drawShadowOval(in: insetRect)
+    drawTrainSnake(in: insetRect)
 
     context.flushGraphics()
     NSGraphicsContext.restoreGraphicsState()

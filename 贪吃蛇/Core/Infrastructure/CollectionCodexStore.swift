@@ -13,6 +13,7 @@ final class CollectionCodexStore {
         static let effectIDs = "snake_orchard.codex.effect_ids"
         static let mechanicIDs = "snake_orchard.codex.mechanic_ids"
         static let levelIDs = "snake_orchard.codex.level_ids"
+        static let recentIDs = "snake_orchard.codex.recent_ids"
     }
 
     private let defaults: UserDefaults
@@ -41,6 +42,10 @@ final class CollectionCodexStore {
         discoveredFruitIDs.count + discoveredEffectIDs.count + discoveredMechanicIDs.count + discoveredLevelIDs.count
     }
 
+    var recentDiscoveryIDs: [String] {
+        defaults.stringArray(forKey: Key.recentIDs) ?? []
+    }
+
     func discoveredIDs(for section: CodexSection) -> Set<String> {
         switch section {
         case .fruits:
@@ -54,24 +59,48 @@ final class CollectionCodexStore {
         }
     }
 
-    func record(level: LevelDefinition) {
-        save(CodexCatalog.levelID(for: level.name), key: Key.levelIDs)
-        if let mechanicID = CodexCatalog.mechanicID(for: level) {
-            save(mechanicID, key: Key.mechanicIDs)
+    @discardableResult
+    func record(level: LevelDefinition) -> [String] {
+        var discovered: [String] = []
+        if save(CodexCatalog.levelID(for: level.name), key: Key.levelIDs) {
+            discovered.append(CodexCatalog.levelID(for: level.name))
         }
+        if let mechanicID = CodexCatalog.mechanicID(for: level) {
+            if save(mechanicID, key: Key.mechanicIDs) {
+                discovered.append(mechanicID)
+            }
+        }
+        return discovered
     }
 
-    func record(fruit: FruitDefinition) {
-        save(CodexCatalog.fruitID(for: fruit.kind), key: Key.fruitIDs)
-        save(CodexCatalog.effectID(for: fruit.effect), key: Key.effectIDs)
+    @discardableResult
+    func record(fruit: FruitDefinition) -> [String] {
+        var discovered: [String] = []
+        let fruitID = CodexCatalog.fruitID(for: fruit.kind)
+        let effectID = CodexCatalog.effectID(for: fruit.effect)
+        if save(fruitID, key: Key.fruitIDs) {
+            discovered.append(fruitID)
+        }
+        if save(effectID, key: Key.effectIDs) {
+            discovered.append(effectID)
+        }
+        return discovered
     }
 
-    private func save(_ id: String, key: String) {
+    private func save(_ id: String, key: String) -> Bool {
         var values = Set(defaults.stringArray(forKey: key) ?? [])
         guard !values.contains(id) else {
-            return
+            return false
         }
         values.insert(id)
         defaults.set(Array(values).sorted(), forKey: key)
+        pushRecent(id)
+        return true
+    }
+
+    private func pushRecent(_ id: String) {
+        var values = recentDiscoveryIDs.filter { $0 != id }
+        values.insert(id, at: 0)
+        defaults.set(Array(values.prefix(4)), forKey: Key.recentIDs)
     }
 }

@@ -33,6 +33,7 @@ final class GameScene: SKScene {
     private var settingsSelection = 0
     private var gameOverSelection = 0
     private var codexSectionSelection = 0
+    private var codexItemSelection = 0
     private var boostButtonHeld = false
     private var boostCooldownRemaining: TimeInterval = 0
 
@@ -171,6 +172,9 @@ final class GameScene: SKScene {
             case .ateFruit(let fruit, _, _):
                 audioController.playFruit(effect: fruit.effect)
                 renderer.play(event)
+            case .codexDiscovered:
+                audioController.playConfirm()
+                renderer.play(event)
             case .comboAdvanced:
                 audioController.playConfirm()
                 renderer.play(event)
@@ -200,17 +204,23 @@ final class GameScene: SKScene {
                 }
             case .missionCompleted:
                 renderer.play(event)
-            case .achievementUnlocked:
+            case .achievementUnlocked, .themeUnlocked:
                 renderer.play(event)
             }
         }
 
-        recordCurrentCodexDiscovery()
+        recordCurrentCodexDiscovery().forEach { renderer.play(.codexDiscovered($0)) }
+        achievementStore.updateProgress(snapshot: engine.snapshot, runStats: engine.runStats)
 
         let unlockedAchievements = achievementStore.unlock(
             AchievementCatalog.unlockedAchievements(snapshot: engine.snapshot, runStats: engine.runStats)
         )
-        unlockedAchievements.forEach { renderer.play(.achievementUnlocked($0)) }
+        unlockedAchievements.forEach { achievement in
+            renderer.play(.achievementUnlocked(achievement))
+            VisualTheme.allCases
+                .filter { $0.unlockAchievementID == achievement.id }
+                .forEach { renderer.play(.themeUnlocked($0)) }
+        }
     }
 
     private func handleDirectionAction(_ direction: Direction) {
@@ -228,11 +238,27 @@ final class GameScene: SKScene {
         case .achievements, .help:
             break
         case .codex:
-            guard direction == .up || direction == .down else {
-                return
+            switch direction {
+            case .up, .down:
+                let delta = direction == .up ? -1 : 1
+                codexSectionSelection = wrappedIndex(codexSectionSelection + delta, count: CodexSection.allCases.count)
+                clampCodexItemSelection()
+            case .left, .right:
+                let delta = direction == .left ? -1 : 1
+                codexItemSelection = wrappedIndex(codexItemSelection + delta, count: codexEntriesForCurrentSection.count)
             }
-            let delta = direction == .up ? -1 : 1
-            codexSectionSelection = wrappedIndex(codexSectionSelection + delta, count: CodexSection.allCases.count)
+            audioController.playNavigate()
+            renderCurrent()
+        case .codexDetail:
+            switch direction {
+            case .up, .down:
+                let delta = direction == .up ? -1 : 1
+                codexSectionSelection = wrappedIndex(codexSectionSelection + delta, count: CodexSection.allCases.count)
+                clampCodexItemSelection()
+            case .left, .right:
+                let delta = direction == .left ? -1 : 1
+                codexItemSelection = wrappedIndex(codexItemSelection + delta, count: codexEntriesForCurrentSection.count)
+            }
             audioController.playNavigate()
             renderCurrent()
         case .settings:
@@ -264,8 +290,16 @@ final class GameScene: SKScene {
         switch mode {
         case .mainMenu:
             applyMainMenuSelection()
-        case .achievements, .help, .codex:
+        case .achievements, .help:
             mode = .mainMenu
+            audioController.playConfirm()
+            syncAudioMode()
+        case .codex:
+            mode = .codexDetail
+            audioController.playConfirm()
+            syncAudioMode()
+        case .codexDetail:
+            mode = .codex
             audioController.playConfirm()
             syncAudioMode()
         case .settings:
@@ -296,7 +330,7 @@ final class GameScene: SKScene {
             mode = .playing
             audioController.playPause()
             syncAudioMode()
-        case .mainMenu, .achievements, .codex, .help, .settings, .ready, .gameOver:
+        case .mainMenu, .achievements, .codex, .codexDetail, .help, .settings, .ready, .gameOver:
             break
         }
         renderCurrent()
@@ -311,6 +345,10 @@ final class GameScene: SKScene {
             syncAudioMode()
         case .paused, .gameOver, .ready:
             mode = .mainMenu
+            syncAudioMode()
+        case .codexDetail:
+            mode = .codex
+            audioController.playConfirm()
             syncAudioMode()
         case .settings, .achievements, .codex, .help:
             mode = .mainMenu
@@ -334,6 +372,7 @@ final class GameScene: SKScene {
             mode = .achievements
         case .codex:
             codexSectionSelection = 0
+            codexItemSelection = 0
             mode = .codex
         case .help:
             mode = .help
@@ -361,6 +400,8 @@ final class GameScene: SKScene {
             audioController.playConfirm()
         case .speed:
             adjustSpeedPreset(step: 1)
+        case .theme:
+            adjustTheme(step: 1)
         case .back:
             audioController.playConfirm()
             mode = .mainMenu
@@ -398,6 +439,8 @@ final class GameScene: SKScene {
             audioController.playNavigate()
         case .speed:
             adjustSpeedPreset(step: step)
+        case .theme:
+            adjustTheme(step: step)
         case .back:
             break
         }
@@ -425,10 +468,29 @@ final class GameScene: SKScene {
         }
     }
 
+    private func adjustTheme(step: Int) {
+        let themes = unlockedThemes
+        guard !themes.isEmpty else {
+            return
+        }
+        guard let currentIndex = themes.firstIndex(of: settings.visualTheme) else {
+            settings.visualTheme = themes[0]
+            persistSettings()
+            audioController.playNavigate()
+            return
+        }
+        settings.visualTheme = themes[wrappedIndex(currentIndex + step, count: themes.count)]
+        persistSettings()
+        audioController.playNavigate()
+    }
+
     private func normalized(_ settings: GameSettings) -> GameSettings {
         var normalizedSettings = settings
         if normalizedSettings.simpleModeEnabled, normalizedSettings.speedPreset == .turbo {
             normalizedSettings.speedPreset = .relaxed
+        }
+        if !unlockedThemes.contains(normalizedSettings.visualTheme) {
+            normalizedSettings.visualTheme = .orchard
         }
         return normalizedSettings
     }
@@ -442,8 +504,8 @@ final class GameScene: SKScene {
     }
 
     private func renderCurrent() {
-        backgroundColor = renderer.backgroundColor(for: engine.snapshot.level)
-        renderer.updateLayout(sceneSize: size, level: engine.snapshot.level)
+        backgroundColor = renderer.backgroundColor(for: engine.snapshot.level, theme: settings.visualTheme)
+        renderer.updateLayout(sceneSize: size, level: engine.snapshot.level, theme: settings.visualTheme)
         renderer.render(
             snapshot: engine.snapshot,
             boostStatus: boostStatus,
@@ -456,7 +518,7 @@ final class GameScene: SKScene {
     private func syncAudioMode() {
         let audioMode: SceneAudioMode
         switch mode {
-        case .mainMenu, .achievements, .codex, .help, .settings, .ready:
+        case .mainMenu, .achievements, .codex, .codexDetail, .help, .settings, .ready:
             audioMode = .menu
         case .playing:
             audioMode = .gameplay
@@ -470,34 +532,39 @@ final class GameScene: SKScene {
         switch mode {
         case .mainMenu:
             let history = runHistoryStore.summary
+            let recentDiscoveries = recentCodexEntries
+                .map { "\($0.symbol)\($0.title)" }
+                .joined(separator: " · ")
             return OverlayMenuState(
                 title: "Snake Orchard",
                 subtitle: settings.simpleModeEnabled ? "极简模式 · 更慢更简单" : "随机地图、随机词条、随机任务",
-                detail: "最高分 \(highScoreStore.highScore) · 最长长度 \(history.bestLength) · 已玩 \(history.totalRuns) 局 · 图鉴 \(codexStore.totalDiscoveredCount)/\(CodexCatalog.all(levelNames: codexLevelNames).count)\n上局: \(history.lastLevelName) / \(history.lastScore) 分 / \(history.lastMissionCompleted ? "任务完成" : "任务未完成")",
+                detail: "最高分 \(highScoreStore.highScore) · 最长长度 \(history.bestLength) · 已玩 \(history.totalRuns) 局 · 图鉴 \(codexStore.totalDiscoveredCount)/\(CodexCatalog.all(levelNames: codexLevelNames).count)\n上局: \(history.lastLevelName) / \(history.lastScore) 分 / \(history.lastMissionCompleted ? "任务完成" : "任务未完成")\(recentDiscoveries.isEmpty ? "" : "\n最近新发现: \(recentDiscoveries)")",
                 items: MainMenuOption.allCases.map {
                     OverlayMenuItem(title: $0.title, subtitle: nil, icon: nil, badge: nil, isDimmed: false)
                 },
+                tabs: [],
                 selectedIndex: mainMenuSelection,
                 footer: "上/下选择 · 空格确认 · Esc 关闭子页",
                 layout: .list
             )
         case .achievements:
-            let unlockedIDs = Set(achievementStore.unlockedAchievements.map(\.id))
             let items = AchievementCatalog.all.map { achievement in
-                let unlocked = unlockedIDs.contains(achievement.id)
+                let progress = achievementStore.progress(for: achievement)
+                let unlocked = progress.isUnlocked
                 return OverlayMenuItem(
                     title: achievement.title,
                     subtitle: achievement.detail,
                     icon: achievement.symbol,
-                    badge: unlocked ? achievement.category.title : "未解锁",
+                    badge: unlocked ? "已解锁 · \(achievement.category.title)" : progress.summaryText,
                     isDimmed: !unlocked
                 )
             }
             return OverlayMenuState(
                 title: "成就图鉴",
                 subtitle: "已解锁 \(achievementStore.unlockedCount)/\(AchievementCatalog.all.count)",
-                detail: "完成任务、挑战机关和收集特殊水果来解锁更多成就。",
+                detail: "完成任务、挑战机关和收集特殊水果来解锁更多成就。未解锁成就会显示你的最佳进度。",
                 items: items,
+                tabs: [],
                 selectedIndex: nil,
                 footer: "空格或 Esc 返回主菜单",
                 layout: .achievementGrid
@@ -518,12 +585,47 @@ final class GameScene: SKScene {
             }
             return OverlayMenuState(
                 title: "收藏图鉴",
-                subtitle: "\(section.symbol) \(section.title) · 已发现 \(discoveredIDs.count)/\(entries.count)",
-                detail: "上/下切换分类：水果、特效、机关、地图。图鉴会随着你真正游玩而逐步点亮。",
+                subtitle: "\(section.symbol) \(section.title) · 已发现 \(discoveredIDs.count)/\(entries.count) · 完成度 \(codexCompletionText(for: section, total: entries.count, current: discoveredIDs.count))",
+                detail: recentCodexEntries.isEmpty
+                    ? "上/下切换分类：水果、特效、机关、地图。图鉴会随着你真正游玩而逐步点亮。"
+                    : "上/下切换分类：水果、特效、机关、地图。最近新发现：\(recentCodexEntries.map { "\($0.symbol)\($0.title)" }.joined(separator: " · "))",
                 items: items,
-                selectedIndex: nil,
-                footer: "上/下切换分类 · 空格或 Esc 返回主菜单",
+                tabs: CodexSection.allCases.map { section in
+                    OverlayTabItem(
+                        title: section.title,
+                        icon: section.symbol,
+                        isSelected: section == CodexSection.allCases[codexSectionSelection]
+                    )
+                },
+                selectedIndex: codexItemSelection,
+                footer: "左/右切换条目 · 上/下切换分类 · 空格查看详情 · Esc 返回主菜单",
                 layout: .achievementGrid
+            )
+        case .codexDetail:
+            let section = CodexSection.allCases[codexSectionSelection]
+            let entry = selectedCodexEntry
+            let discovered = entry.map { codexStore.discoveredIDs(for: section).contains($0.id) } ?? false
+            return OverlayMenuState(
+                title: discovered ? "\(entry?.symbol ?? "•") \(entry?.title ?? "未知条目")" : "❔ 未发现条目",
+                subtitle: "\(section.symbol) \(section.title) · \(discovered ? "已发现" : "未发现")",
+                detail: discovered
+                    ? entry?.detail
+                    : "继续游玩来解锁这个条目。图鉴只会记录你真正见过的水果、特效、机关和地图。",
+                items: [
+                    OverlayMenuItem(title: "状态", subtitle: discovered ? "已记录进图鉴" : "尚未发现", icon: discovered ? "✓" : "…", badge: nil, isDimmed: !discovered),
+                    OverlayMenuItem(title: "分类", subtitle: section.title, icon: section.symbol, badge: nil, isDimmed: false),
+                    OverlayMenuItem(title: "解锁方式", subtitle: codexUnlockHint(for: entry, discovered: discovered), icon: "⌁", badge: nil, isDimmed: false)
+                ],
+                tabs: CodexSection.allCases.map { section in
+                    OverlayTabItem(
+                        title: section.title,
+                        icon: section.symbol,
+                        isSelected: section == CodexSection.allCases[codexSectionSelection]
+                    )
+                },
+                selectedIndex: nil,
+                footer: "左/右切换条目 · 上/下切换分类 · 空格或 Esc 返回图鉴",
+                layout: .list
             )
         case .help:
             let helpDetail = settings.simpleModeEnabled
@@ -548,6 +650,7 @@ final class GameScene: SKScene {
                 subtitle: settings.simpleModeEnabled ? "先熟悉方向，再慢慢提高难度" : "先活下来，再追求更高收益",
                 detail: helpDetail,
                 items: helpItems,
+                tabs: [],
                 selectedIndex: nil,
                 footer: "空格或 Esc 返回主菜单",
                 layout: .list
@@ -569,6 +672,14 @@ final class GameScene: SKScene {
                     )
                 case .speed:
                     return OverlayMenuItem(title: option.title, subtitle: settings.speedPreset.title, icon: "➤", badge: nil, isDimmed: false)
+                case .theme:
+                    return OverlayMenuItem(
+                        title: option.title,
+                        subtitle: "\(settings.visualTheme.symbol) \(settings.visualTheme.title)",
+                        icon: "🎨",
+                        badge: "\(unlockedThemes.count)/\(VisualTheme.allCases.count)",
+                        isDimmed: false
+                    )
                 case .back:
                     return OverlayMenuItem(title: option.title, subtitle: nil, icon: "⌂", badge: nil, isDimmed: false)
                 }
@@ -576,10 +687,9 @@ final class GameScene: SKScene {
             return OverlayMenuState(
                 title: "设置",
                 subtitle: "修改会立即生效",
-                detail: settings.simpleModeEnabled
-                    ? "极简模式会限制为更简单的关卡和普通水果，并屏蔽极速档。"
-                    : "音效和音乐会立即应用，速度会直接影响当前与下一局的移动节奏。",
+                detail: settingsDetailText,
                 items: items,
+                tabs: [],
                 selectedIndex: settingsSelection,
                 footer: "上/下切换 · 左/右调整 · 空格确认 · Esc 返回",
                 layout: .list
@@ -593,6 +703,7 @@ final class GameScene: SKScene {
                 subtitle: "本局得分 \(engine.snapshot.score) · 最高 \(engine.snapshot.highScore) · 任务 \(engine.snapshot.missionProgress.summaryText)",
                 detail: "关卡: \(engine.snapshot.level.name) · 词条: \(engine.snapshot.modifier.title) · 模式: \(engine.snapshot.isSimpleModeEnabled ? "极简" : "标准")\n长度 \(engine.snapshot.snake.count) · 水果 \(engine.snapshot.fruitsEaten) · 生存 \(engine.snapshot.stepsSurvived) 步\n已解锁成就: \(progressSummary.unlockedAchievements)/\(progressSummary.totalAchievements)",
                 items: items,
+                tabs: [],
                 selectedIndex: gameOverSelection,
                 footer: "上/下选择 · 空格确认 · Esc 返回主菜单",
                 layout: .list
@@ -619,6 +730,35 @@ final class GameScene: SKScene {
 
     private var codexLevelNames: [String] {
         levelFactory.allLevels(isSimpleModeEnabled: false).map(\.name)
+    }
+
+    private var recentCodexEntries: [CodexEntryDefinition] {
+        codexStore.recentDiscoveryIDs.compactMap { codexEntryLookup[$0] }
+    }
+
+    private var unlockedThemes: [VisualTheme] {
+        ThemeCatalog.unlockedThemes(for: achievementStore.unlockedIDs)
+    }
+
+    private var codexEntriesForCurrentSection: [CodexEntryDefinition] {
+        CodexCatalog.entries(for: CodexSection.allCases[codexSectionSelection], levelNames: codexLevelNames)
+    }
+
+    private var selectedCodexEntry: CodexEntryDefinition? {
+        let entries = codexEntriesForCurrentSection
+        guard !entries.isEmpty else {
+            return nil
+        }
+        return entries[wrappedIndex(codexItemSelection, count: entries.count)]
+    }
+
+    private var codexEntryLookup: [String: CodexEntryDefinition] {
+        Dictionary(uniqueKeysWithValues: CodexCatalog.all(levelNames: codexLevelNames).map { ($0.id, $0) })
+    }
+
+    private func clampCodexItemSelection() {
+        let count = codexEntriesForCurrentSection.count
+        codexItemSelection = count > 0 ? wrappedIndex(codexItemSelection, count: count) : 0
     }
 
     private var boostStatus: BoostStatusSnapshot {
@@ -661,13 +801,59 @@ final class GameScene: SKScene {
 
     private func beginCurrentRun() {
         mode = .playing
-        recordCurrentCodexDiscovery()
+        recordCurrentCodexDiscovery().forEach { renderer.play(.codexDiscovered($0)) }
     }
 
-    private func recordCurrentCodexDiscovery() {
-        codexStore.record(level: engine.snapshot.level)
+    private func recordCurrentCodexDiscovery() -> [CodexEntryDefinition] {
+        var discoveredIDs = codexStore.record(level: engine.snapshot.level)
         if let fruit = engine.snapshot.fruit {
-            codexStore.record(fruit: fruit)
+            discoveredIDs += codexStore.record(fruit: fruit)
+        }
+        return discoveredIDs.compactMap { codexEntryLookup[$0] }
+    }
+
+    private func codexCompletionText(for section: CodexSection, total: Int, current: Int) -> String {
+        guard total > 0 else {
+            return "0%"
+        }
+        let percent = Int((Double(current) / Double(total) * 100).rounded())
+        return "\(percent)%"
+    }
+
+    private func codexUnlockHint(for entry: CodexEntryDefinition?, discovered: Bool) -> String {
+        guard let entry else {
+            return "当前分类没有更多条目。"
+        }
+        if discovered {
+            return "你已经解锁了这条记录。"
+        }
+
+        switch entry.section {
+        case .fruits:
+            return "吃到对应水果后就会记录。"
+        case .effects:
+            return "遇到对应特效果实时会记录。"
+        case .mechanics:
+            return "进入带有对应机关的地图即可记录。"
+        case .levels:
+            return "开始这张地图的一局后就会记录。"
+        }
+    }
+
+    private var settingsDetailText: String {
+        switch SettingsOption.allCases[settingsSelection] {
+        case .theme:
+            return "\(settings.visualTheme.symbol) \(settings.visualTheme.title) · \(settings.visualTheme.detail)\n\(settings.visualTheme.unlockHint) · 已解锁 \(unlockedThemes.count)/\(VisualTheme.allCases.count)"
+        case .simpleMode:
+            return settings.simpleModeEnabled
+                ? "极简模式会限制为更简单的关卡和普通水果，并屏蔽极速档。皮肤会同步影响菜单和对局配色。"
+                : "普通模式会开放特殊水果、机关地图和更多高风险高收益玩法。"
+        case .speed:
+            return "速度会直接影响当前与下一局的移动节奏。极简模式下只开放轻松和标准。"
+        case .sound, .music:
+            return "音效和音乐会立即应用到菜单和对局。"
+        case .back:
+            return "返回主菜单，当前设置会自动保存。"
         }
     }
 }
