@@ -47,6 +47,19 @@ enum Direction {
     func isOpposite(to other: Direction) -> Bool {
         (dx + other.dx == 0) && (dy + other.dy == 0)
     }
+
+    var rotationAngle: CGFloat {
+        switch self {
+        case .right:
+            return 0
+        case .left:
+            return .pi
+        case .up:
+            return .pi / 2
+        case .down:
+            return -.pi / 2
+        }
+    }
 }
 
 enum FruitKind: CaseIterable, Hashable {
@@ -316,6 +329,8 @@ enum MissionGoal: Equatable {
     case score(Int)
     case reachLength(Int)
     case specificFruit(kind: FruitKind, count: Int)
+    case differentFruitKinds(Int)
+    case collectionSet([FruitKind])
     case specialFruit(Int)
     case surviveSteps(Int)
 
@@ -324,9 +339,12 @@ enum MissionGoal: Equatable {
         case .fruits(let count),
              .score(let count),
              .reachLength(let count),
+             .differentFruitKinds(let count),
              .specialFruit(let count),
              .surviveSteps(let count):
             return count
+        case .collectionSet(let kinds):
+            return Set(kinds).count
         case .specificFruit(_, let count):
             return count
         }
@@ -356,6 +374,10 @@ enum AchievementID: String, CaseIterable {
     case longTail
     case missionStarter
     case hazardRunner
+    case rainbowPicnic
+    case speedster
+    case poopTrail
+    case trainCollector
 }
 
 enum AchievementCategory {
@@ -399,6 +421,8 @@ struct GameRunStats {
     var fruitsByKind: [FruitKind: Int] = [:]
     var fruitsByEffect: [FruitEffect: Int] = [:]
     var missionCompleted = false
+    var boostUses = 0
+    var poopDrops = 0
 
     mutating func recordFruit(_ fruit: FruitDefinition) {
         fruitsByKind[fruit.kind, default: 0] += 1
@@ -424,11 +448,236 @@ struct GameRunStats {
             }
         }
     }
+
+    var uniqueFruitKindsEaten: Int {
+        fruitsByKind.filter { $0.value > 0 }.count
+    }
 }
 
 struct GameProgressSummary {
     let unlockedAchievements: Int
     let totalAchievements: Int
+}
+
+enum CodexSection: CaseIterable {
+    case fruits
+    case effects
+    case mechanics
+    case levels
+
+    var title: String {
+        switch self {
+        case .fruits:
+            return "水果"
+        case .effects:
+            return "特效"
+        case .mechanics:
+            return "机关"
+        case .levels:
+            return "地图"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .fruits:
+            return "🍎"
+        case .effects:
+            return "✨"
+        case .mechanics:
+            return "⚙"
+        case .levels:
+            return "🗺"
+        }
+    }
+}
+
+struct CodexEntryDefinition: Equatable {
+    let id: String
+    let title: String
+    let detail: String
+    let symbol: String
+    let section: CodexSection
+}
+
+enum CodexCatalog {
+    static let mechanicEntries: [CodexEntryDefinition] = [
+        CodexEntryDefinition(id: "mechanic_sweeper", title: "横扫机关", detail: "一排障碍在走廊里来回横扫。", symbol: "↔", section: .mechanics),
+        CodexEntryDefinition(id: "mechanic_gate", title: "中央闸门", detail: "会周期性开启和闭合的水闸。", symbol: "▥", section: .mechanics),
+        CodexEntryDefinition(id: "mechanic_rotor", title: "旋刃机关", detail: "围绕中心切换方向的旋转刀阵。", symbol: "✶", section: .mechanics),
+        CodexEntryDefinition(id: "mechanic_crusher", title: "夹壁机关", detail: "上下石壁会向中间缓慢合拢。", symbol: "⬍", section: .mechanics),
+        CodexEntryDefinition(id: "mechanic_collapse", title: "塌陷地板", detail: "走过的尾迹会短暂塌陷，不能立刻回头。", symbol: "▧", section: .mechanics)
+    ]
+
+    static var fruitEntries: [CodexEntryDefinition] {
+        FruitKind.allCases.map {
+            CodexEntryDefinition(
+                id: fruitID(for: $0),
+                title: $0.name,
+                detail: $0 == .pomelo ? "吃到后增加 2 节。" : "吃到后增加 1 节。",
+                symbol: $0.symbol,
+                section: .fruits
+            )
+        }
+    }
+
+    static var effectEntries: [CodexEntryDefinition] {
+        FruitEffect.allCases.map {
+            CodexEntryDefinition(
+                id: effectID(for: $0),
+                title: $0 == .normal ? "普通果实" : "\($0.title)果实",
+                detail: effectDetail(for: $0),
+                symbol: $0 == .normal ? "•" : $0.badge,
+                section: .effects
+            )
+        }
+    }
+
+    static func levelEntries(names: [String]) -> [CodexEntryDefinition] {
+        names.map { name in
+            CodexEntryDefinition(
+                id: levelID(for: name),
+                title: name,
+                detail: levelDetail(for: name),
+                symbol: levelSymbol(for: name),
+                section: .levels
+            )
+        }
+    }
+
+    static func entries(for section: CodexSection, levelNames: [String]) -> [CodexEntryDefinition] {
+        switch section {
+        case .fruits:
+            return fruitEntries
+        case .effects:
+            return effectEntries
+        case .mechanics:
+            return mechanicEntries
+        case .levels:
+            return levelEntries(names: levelNames)
+        }
+    }
+
+    static func all(levelNames: [String]) -> [CodexEntryDefinition] {
+        CodexSection.allCases.flatMap { entries(for: $0, levelNames: levelNames) }
+    }
+
+    static func fruitID(for kind: FruitKind) -> String {
+        "fruit_\(kind.name)"
+    }
+
+    static func effectID(for effect: FruitEffect) -> String {
+        switch effect {
+        case .normal:
+            return "effect_normal"
+        case .golden:
+            return "effect_golden"
+        case .frost:
+            return "effect_frost"
+        case .ghost:
+            return "effect_ghost"
+        case .warp:
+            return "effect_warp"
+        case .bomb:
+            return "effect_bomb"
+        }
+    }
+
+    static func levelID(for name: String) -> String {
+        "level_\(name)"
+    }
+
+    static func mechanicID(for level: LevelDefinition) -> String? {
+        if level.hasCollapsingTiles {
+            return "mechanic_collapse"
+        }
+
+        guard let mechanic = level.dynamicMechanic else {
+            return nil
+        }
+
+        switch mechanic {
+        case .sweeper:
+            return "mechanic_sweeper"
+        case .pulseGate:
+            return "mechanic_gate"
+        case .rotor:
+            return "mechanic_rotor"
+        case .crusher:
+            return "mechanic_crusher"
+        }
+    }
+
+    private static func effectDetail(for effect: FruitEffect) -> String {
+        switch effect {
+        case .normal:
+            return "基础果实，没有额外效果。"
+        case .golden:
+            return "得分翻倍，适合冲分。"
+        case .frost:
+            return "短时间减速，给你更多反应时间。"
+        case .ghost:
+            return "短时间允许穿过自己。"
+        case .warp:
+            return "短时间允许穿墙，从另一侧穿出。"
+        case .bomb:
+            return "会在周围炸出临时危险区。"
+        }
+    }
+
+    private static func levelSymbol(for name: String) -> String {
+        switch name {
+        case "草地":
+            return "🌿"
+        case "门廊":
+            return "🏛"
+        case "双塔":
+            return "🗼"
+        case "斗兽场":
+            return "🏟"
+        case "折返跑":
+            return "〰"
+        case "回旋走廊":
+            return "↔"
+        case "水闸":
+            return "🚪"
+        case "风车庭院":
+            return "✶"
+        case "石壁夹道":
+            return "🧱"
+        case "浮桥":
+            return "🌉"
+        default:
+            return "◻"
+        }
+    }
+
+    private static func levelDetail(for name: String) -> String {
+        switch name {
+        case "草地":
+            return "空旷新手图，适合熟悉方向。"
+        case "门廊":
+            return "上下横墙留出中间通道。"
+        case "双塔":
+            return "左右双塔会把路线切成三段。"
+        case "斗兽场":
+            return "中心封闭区域要求你绕外圈跑。"
+        case "折返跑":
+            return "横向障碍让你不断折返换线。"
+        case "回旋走廊":
+            return "中段有会左右横扫的机关。"
+        case "水闸":
+            return "中央闸门会周期性打开和关闭。"
+        case "风车庭院":
+            return "中央旋刃会轮流切换方向。"
+        case "石壁夹道":
+            return "上下夹壁会向中间慢慢合拢。"
+        case "浮桥":
+            return "尾迹会塌陷，回头会更危险。"
+        default:
+            return "一张未知地图。"
+        }
+    }
 }
 
 enum AchievementCatalog {
@@ -438,7 +687,11 @@ enum AchievementCatalog {
         AchievementDefinition(id: .goldenHunter, title: "金彩猎手", detail: "单局吃到 2 个金彩水果", symbol: "✦", category: .challenge),
         AchievementDefinition(id: .longTail, title: "长尾进化", detail: "蛇身长度达到 18", symbol: "🐍", category: .mastery),
         AchievementDefinition(id: .missionStarter, title: "任务达人", detail: "完成任意一局任务", symbol: "✓", category: .challenge),
-        AchievementDefinition(id: .hazardRunner, title: "机关舞者", detail: "在机关关卡拿到 80 分", symbol: "⚙", category: .mastery)
+        AchievementDefinition(id: .hazardRunner, title: "机关舞者", detail: "在机关关卡拿到 80 分", symbol: "⚙", category: .mastery),
+        AchievementDefinition(id: .rainbowPicnic, title: "彩虹野餐", detail: "单局吃到全部 5 种水果", symbol: "🌈", category: .collection),
+        AchievementDefinition(id: .speedster, title: "喷射车手", detail: "单局使用 1 次加速", symbol: "⚡", category: .mastery),
+        AchievementDefinition(id: .poopTrail, title: "便便尾迹", detail: "单局甩出 3 团便便残留", symbol: "💩", category: .challenge),
+        AchievementDefinition(id: .trainCollector, title: "列车长", detail: "极简模式下收集 4 种水果车厢", symbol: "🚂", category: .collection)
     ]
 
     static func definition(for id: AchievementID) -> AchievementDefinition? {
@@ -466,6 +719,18 @@ enum AchievementCatalog {
         if snapshot.level.dynamicMechanic != nil && snapshot.score >= 80 {
             append(.hazardRunner, to: &unlocked)
         }
+        if runStats.uniqueFruitKindsEaten >= FruitKind.allCases.count {
+            append(.rainbowPicnic, to: &unlocked)
+        }
+        if runStats.boostUses >= 1 {
+            append(.speedster, to: &unlocked)
+        }
+        if runStats.poopDrops >= 3 {
+            append(.poopTrail, to: &unlocked)
+        }
+        if snapshot.isSimpleModeEnabled && runStats.uniqueFruitKindsEaten >= 4 {
+            append(.trainCollector, to: &unlocked)
+        }
 
         return unlocked
     }
@@ -488,6 +753,7 @@ enum DynamicObstacleStyle {
 enum TemporaryHazardStyle {
     case collapse
     case bomb
+    case poop
 }
 
 struct DynamicObstacleSnapshot {
@@ -678,7 +944,11 @@ struct GameSnapshot {
     let modifier: RunModifier
     let mission: MissionDefinition
     let missionProgress: MissionProgress
+    let isSimpleModeEnabled: Bool
+    let currentDirection: Direction
+    let childSafetyBrakeAvailable: Bool
     let snake: [GridPoint]
+    let trainCarriages: [FruitKind?]
     let dynamicObstacle: DynamicObstacleSnapshot?
     let temporaryHazards: [TemporaryHazardSnapshot]
     let fruitPosition: GridPoint?
@@ -690,11 +960,20 @@ struct GameSnapshot {
     let stepsSurvived: Int
     let comboCount: Int
     let comboBonus: Int
+    let boostMovesRemaining: Int
     let isGameOver: Bool
     let statusText: String
     let hintText: String
     let activeEffectText: String?
     let mechanicText: String?
+}
+
+struct BoostStatusSnapshot {
+    let isReady: Bool
+    let chargeProgress: Double
+    let cooldownRemaining: TimeInterval
+    let isHeld: Bool
+    let hasEnoughLength: Bool
 }
 
 enum SpeedPreset: String, CaseIterable {
@@ -729,11 +1008,13 @@ struct GameSettings: Equatable {
     var soundEnabled: Bool
     var musicEnabled: Bool
     var speedPreset: SpeedPreset
+    var simpleModeEnabled: Bool
 
     static let `default` = GameSettings(
         soundEnabled: true,
         musicEnabled: true,
-        speedPreset: .standard
+        speedPreset: .standard,
+        simpleModeEnabled: false
     )
 }
 
@@ -741,8 +1022,10 @@ enum MainMenuOption: CaseIterable {
     case start
     case reroll
     case achievements
+    case codex
     case help
     case settings
+    case quit
 
     var title: String {
         switch self {
@@ -752,10 +1035,14 @@ enum MainMenuOption: CaseIterable {
             return "换一张图"
         case .achievements:
             return "成就图鉴"
+        case .codex:
+            return "收藏图鉴"
         case .help:
             return "玩法帮助"
         case .settings:
             return "设置"
+        case .quit:
+            return "退出游戏"
         }
     }
 }
@@ -763,6 +1050,7 @@ enum MainMenuOption: CaseIterable {
 enum SettingsOption: CaseIterable {
     case sound
     case music
+    case simpleMode
     case speed
     case back
 
@@ -772,6 +1060,8 @@ enum SettingsOption: CaseIterable {
             return "音效"
         case .music:
             return "音乐"
+        case .simpleMode:
+            return "模式"
         case .speed:
             return "速度"
         case .back:
@@ -854,6 +1144,7 @@ struct RunHistorySummary {
 enum SceneMode {
     case mainMenu
     case achievements
+    case codex
     case help
     case ready
     case playing
@@ -867,7 +1158,9 @@ enum GameEvent {
     case comboAdvanced(count: Int, bonus: Int)
     case fruitExpired(FruitDefinition)
     case bombTriggered
+    case boostActivated
     case floorCollapsed
+    case safetyBrake
     case gameOver
     case highScoreUpdated(Int)
     case missionCompleted(MissionDefinition)

@@ -10,15 +10,17 @@ import AppKit
 enum GameInputAction {
     case changeDirection(Direction)
     case primaryAction
+    case boostPressed
+    case boostReleased
     case togglePause
     case secondaryAction
 }
 
 struct GameInputController {
-    func action(for event: NSEvent) -> GameInputAction? {
+    func action(for event: NSEvent, isPlaying: Bool) -> GameInputAction? {
         switch event.keyCode {
         case 49:
-            return .primaryAction
+            return isPlaying ? .boostPressed : .primaryAction
         case 35:
             return .togglePause
         case 53:
@@ -46,7 +48,7 @@ struct GameInputController {
         case "w":
             return .changeDirection(.up)
         case "\r", " ":
-            return .primaryAction
+            return isPlaying && characters == " " ? .boostPressed : .primaryAction
         case "p":
             return .togglePause
         case "m":
@@ -54,5 +56,18 @@ struct GameInputController {
         default:
             return nil
         }
+    }
+
+    func keyUpAction(for event: NSEvent, isPlaying: Bool) -> GameInputAction? {
+        guard isPlaying else {
+            return nil
+        }
+
+        if event.keyCode == 49 {
+            return .boostReleased
+        }
+
+        let characters = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        return characters == " " ? .boostReleased : nil
     }
 }

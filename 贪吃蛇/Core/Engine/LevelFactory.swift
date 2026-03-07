@@ -8,7 +8,12 @@
 import Foundation
 
 struct LevelFactory {
-    func randomLevel() -> LevelDefinition {
+    func randomLevel(isSimpleModeEnabled: Bool = false) -> LevelDefinition {
+        let availableLevels = allLevels(isSimpleModeEnabled: isSimpleModeEnabled)
+        return availableLevels.randomElement() ?? allLevels(isSimpleModeEnabled: true).first!
+    }
+
+    func allLevels(isSimpleModeEnabled: Bool = false) -> [LevelDefinition] {
         let columns = 20
         let rows = 14
 
@@ -172,7 +177,9 @@ struct LevelFactory {
             hasCollapsingTiles: true
         )
 
-        return [empty, gateway, towers, arena, zigzag, sweeper, pulseGate, rotor, crusher, footbridge].randomElement() ?? empty
+        let standardPool = [empty, gateway, towers, arena, zigzag, sweeper, pulseGate, rotor, crusher, footbridge]
+        let simplePool = [empty, gateway, towers, arena]
+        return isSimpleModeEnabled ? simplePool : standardPool
     }
 
     private func line(fromX start: Int, toX end: Int, y: Int) -> [GridPoint] {

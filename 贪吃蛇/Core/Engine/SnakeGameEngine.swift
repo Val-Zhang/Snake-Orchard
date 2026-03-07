@@ -22,6 +22,7 @@ final class SnakeGameEngine {
     private(set) var missionProgress = MissionProgress(current: 0, target: 1, isCompleted: false)
     private(set) var runStats = GameRunStats()
     private(set) var snake: [GridPoint] = []
+    private(set) var trainCarriages: [FruitKind?] = []
     private(set) var dynamicObstacle: DynamicObstacleSnapshot?
     private(set) var temporaryHazards: [TemporaryHazardSnapshot] = []
     private(set) var fruitPosition: GridPoint?
@@ -30,13 +31,16 @@ final class SnakeGameEngine {
     private(set) var highScore = 0
     private(set) var fruitsEaten = 0
     private(set) var isGameOver = false
+    private(set) var isSimpleModeEnabled = false
+    private(set) var childSafetyBrakeAvailable = false
 
     private var direction: Direction = .right
     private var pendingDirection: Direction?
-    private var queuedGrowth = 0
+    private var pendingCarriages: [FruitKind] = []
     private var slowMovesRemaining = 0
     private var ghostMovesRemaining = 0
     private var wrapMovesRemaining = 0
+    private var boostMovesRemaining = 0
     private var fruitCountdownRemaining: Int?
     private var comboCount = 0
     private var comboWindowRemaining = 0
@@ -55,8 +59,15 @@ final class SnakeGameEngine {
 
     var tickDuration: TimeInterval {
         let baseDuration = level.tickDuration * modifier.tickMultiplier
-        let adjustedDuration = baseDuration * userSpeedMultiplier
-        return slowMovesRemaining > 0 ? adjustedDuration * 1.35 : adjustedDuration
+        let simplicityMultiplier = isSimpleModeEnabled ? 1.32 : 1.0
+        var adjustedDuration = baseDuration * userSpeedMultiplier * simplicityMultiplier
+        if slowMovesRemaining > 0 {
+            adjustedDuration *= 1.35
+        }
+        if boostMovesRemaining > 0 {
+            adjustedDuration *= 0.58
+        }
+        return max(0.055, adjustedDuration)
     }
 
     var snapshot: GameSnapshot {
@@ -65,7 +76,11 @@ final class SnakeGameEngine {
             modifier: modifier,
             mission: mission,
             missionProgress: missionProgress,
+            isSimpleModeEnabled: isSimpleModeEnabled,
+            currentDirection: direction,
+            childSafetyBrakeAvailable: childSafetyBrakeAvailable,
             snake: snake,
+            trainCarriages: trainCarriages,
             dynamicObstacle: dynamicObstacle,
             temporaryHazards: temporaryHazards,
             fruitPosition: fruitPosition,
@@ -77,28 +92,38 @@ final class SnakeGameEngine {
             stepsSurvived: runStats.stepsSurvived,
             comboCount: comboCount,
             comboBonus: lastComboBonus,
+            boostMovesRemaining: boostMovesRemaining,
             isGameOver: isGameOver,
             statusText: isGameOver ? (endMessage ?? "游戏结束") : "方向键 / WASD 控制",
-            hintText: isGameOver ? restartHint : gameplayHint,
+            hintText: isGameOver ? restartHint : currentGameplayHint,
             activeEffectText: activeEffectText,
             mechanicText: level.dynamicMechanic?.statusText(at: mechanicTick)
         )
     }
 
-    func restart(with level: LevelDefinition, modifier: RunModifier, mission: MissionDefinition, highScore: Int) {
+    func restart(
+        with level: LevelDefinition,
+        modifier: RunModifier,
+        mission: MissionDefinition,
+        highScore: Int,
+        isSimpleModeEnabled: Bool = false
+    ) {
         self.level = level
         self.modifier = modifier
         self.mission = mission
         self.highScore = highScore
+        self.isSimpleModeEnabled = isSimpleModeEnabled
+        childSafetyBrakeAvailable = isSimpleModeEnabled
         direction = .right
         pendingDirection = nil
-        queuedGrowth = 0
+        pendingCarriages = []
         score = 0
         fruitsEaten = 0
         isGameOver = false
         slowMovesRemaining = 0
         ghostMovesRemaining = 0
         wrapMovesRemaining = 0
+        boostMovesRemaining = 0
         fruitCountdownRemaining = nil
         comboCount = 0
         comboWindowRemaining = 0
@@ -112,6 +137,7 @@ final class SnakeGameEngine {
         missionProgress = Self.makeMissionProgress(for: mission, snapshot: nil, runStats: runStats)
 
         snake = makeStartingSnake(in: level)
+        trainCarriages = Array(repeating: nil, count: max(0, snake.count - 1))
         fruitPosition = nil
         fruit = nil
         spawnFruit()
@@ -120,6 +146,10 @@ final class SnakeGameEngine {
 
     func applySpeedPreset(_ preset: SpeedPreset) {
         userSpeedMultiplier = preset.tickMultiplier
+    }
+
+    var canActivateBoost: Bool {
+        !isGameOver && snake.count > 3
     }
 
     func queueDirection(_ requestedDirection: Direction) {
@@ -131,6 +161,26 @@ final class SnakeGameEngine {
         if !requestedDirection.isOpposite(to: referenceDirection) {
             pendingDirection = requestedDirection
         }
+    }
+
+    func activateBoost() -> [GameEvent] {
+        guard canActivateBoost else {
+            return []
+        }
+
+        boostMovesRemaining = max(boostMovesRemaining, 5)
+        runStats.boostUses += 1
+
+        let detachedSegment = snake.removeLast()
+        if !trainCarriages.isEmpty {
+            trainCarriages.removeLast()
+        }
+        if armPoopResidue(at: detachedSegment) {
+            runStats.poopDrops += 1
+        }
+
+        missionProgress = Self.makeMissionProgress(for: mission, snapshot: snapshot, runStats: runStats)
+        return [.boostActivated]
     }
 
     func advance() -> [GameEvent] {
@@ -149,7 +199,7 @@ final class SnakeGameEngine {
         let nextHead = normalizedHead(from: rawNextHead)
         let eatingFruit = fruitPosition.map { nextHead == $0 } ?? false
         let growthFromFruit = eatingFruit ? (fruit?.growth ?? 0) : 0
-        let tailWillRemain = queuedGrowth > 0 || growthFromFruit > 0
+        let tailWillRemain = !pendingCarriages.isEmpty || growthFromFruit > 0
         let collisionBody = tailWillRemain ? snake : Array(snake.dropLast())
         let dynamicBlocked = Set(dynamicObstacle?.points ?? [])
         let temporaryBlocked = Set(activeTemporaryHazards.keys)
@@ -164,6 +214,13 @@ final class SnakeGameEngine {
         let hitSelf = !hasGhostActive && collisionBody.contains(nextHead)
 
         if hitWall || hitObstacle || hitDynamicObstacle || hitSelf || hitTemporaryHazard {
+            if isSimpleModeEnabled, childSafetyBrakeAvailable {
+                childSafetyBrakeAvailable = false
+                slowMovesRemaining = max(slowMovesRemaining, 10)
+                pendingDirection = nil
+                events.append(.safetyBrake)
+                return events
+            }
             if hitTemporaryHazard {
                 endGame(message: temporaryHazardMessage(for: activeTemporaryHazards[nextHead]?.style))
             } else {
@@ -177,18 +234,18 @@ final class SnakeGameEngine {
 
         let eatenFruit = fruit
         if let eatenFruit, eatingFruit {
-            queuedGrowth += eatenFruit.growth
+            pendingCarriages.append(contentsOf: Array(repeating: eatenFruit.kind, count: eatenFruit.growth))
             fruitsEaten += 1
             runStats.recordFruit(eatenFruit)
-            let comboBonus = nextComboBonus()
+            let comboBonus = isSimpleModeEnabled ? 0 : nextComboBonus()
             let gainedPoints = modifiedScore(for: eatenFruit) + comboBonus
             score += gainedPoints
             slowMovesRemaining += eatenFruit.effect.slowMoveBonus
             ghostMovesRemaining += eatenFruit.effect.ghostMoveBonus
             wrapMovesRemaining += eatenFruit.effect.wrapMoveBonus
-            comboWindowRemaining = 5
+            comboWindowRemaining = isSimpleModeEnabled ? 0 : 5
             events.append(.ateFruit(fruit: eatenFruit, at: nextHead, points: gainedPoints))
-            if comboCount >= 2 {
+            if !isSimpleModeEnabled, comboCount >= 2 {
                 events.append(.comboAdvanced(count: comboCount, bonus: comboBonus))
             }
             if eatenFruit.effect == .bomb {
@@ -200,7 +257,7 @@ final class SnakeGameEngine {
                 events.append(.highScoreUpdated(highScore))
             }
             spawnFruit()
-        } else if comboWindowRemaining > 0 {
+        } else if !isSimpleModeEnabled, comboWindowRemaining > 0 {
             comboWindowRemaining -= 1
             if comboWindowRemaining == 0 {
                 comboCount = 0
@@ -209,10 +266,14 @@ final class SnakeGameEngine {
         }
 
         var collapsedTileAdded = false
-        if queuedGrowth > 0 {
-            queuedGrowth -= 1
+        if let pendingCarriage = pendingCarriages.first {
+            pendingCarriages.removeFirst()
+            trainCarriages.append(pendingCarriage)
         } else {
             let removedTail = snake.removeLast()
+            if !trainCarriages.isEmpty {
+                trainCarriages.removeLast()
+            }
             if armCollapsingTile(at: removedTail) {
                 collapsedTileAdded = true
             }
@@ -227,7 +288,10 @@ final class SnakeGameEngine {
         if wrapMovesRemaining > 0 {
             wrapMovesRemaining -= 1
         }
-        if !eatingFruit, let fruitCountdownRemaining {
+        if boostMovesRemaining > 0 {
+            boostMovesRemaining -= 1
+        }
+        if !isSimpleModeEnabled, !eatingFruit, let fruitCountdownRemaining {
             let updatedCountdown = fruitCountdownRemaining - 1
             if updatedCountdown <= 0 {
                 if let fruit {
@@ -294,7 +358,9 @@ final class SnakeGameEngine {
         }
 
         fruitPosition = nextPosition
-        fruitCountdownRemaining = Int.random(in: 0 ..< 100) < 35 ? Int.random(in: 8 ... 12) : nil
+        fruitCountdownRemaining = isSimpleModeEnabled
+            ? nil
+            : (Int.random(in: 0 ..< 100) < 35 ? Int.random(in: 8 ... 12) : nil)
         fruit = FruitDefinition(
             kind: FruitKind.allCases.randomElement() ?? .apple,
             effect: randomEffect()
@@ -338,6 +404,10 @@ final class SnakeGameEngine {
     }
 
     private func randomEffect() -> FruitEffect {
+        guard !isSimpleModeEnabled else {
+            return .normal
+        }
+
         let roll = Int.random(in: 0 ..< 100)
         let goldenThreshold = min(70, 14 + modifier.goldenChanceBonus)
         let frostThreshold = min(85, goldenThreshold + 14 + modifier.frostChanceBonus)
@@ -377,6 +447,10 @@ final class SnakeGameEngine {
             current = snapshot?.snake.count ?? 0
         case .specificFruit(let kind, _):
             current = runStats.fruits(for: kind)
+        case .differentFruitKinds:
+            current = runStats.uniqueFruitKindsEaten
+        case .collectionSet(let kinds):
+            current = Set(kinds).filter { runStats.fruits(for: $0) > 0 }.count
         case .specialFruit:
             current = runStats.totalSpecialFruitsEaten
         case .surviveSteps:
@@ -398,6 +472,14 @@ final class SnakeGameEngine {
         wrapMovesRemaining > 0
     }
 
+    private var currentGameplayHint: String {
+        if isSimpleModeEnabled {
+            let brakeHint = childSafetyBrakeAvailable ? "；还带一次安全刹车" : "；安全刹车已用完"
+            return gameplayHint + "；儿童模式节奏更慢，火车会按水果种类增加车厢；长按空格喷射，每 5 秒一次，会甩掉一节尾巴" + brakeHint
+        }
+        return gameplayHint + "；长按空格喷射，每 5 秒一次，会甩掉一节尾巴并留下短暂残留"
+    }
+
     private var activeEffectText: String? {
         var parts: [String] = []
         if slowMovesRemaining > 0 {
@@ -408,6 +490,9 @@ final class SnakeGameEngine {
         }
         if wrapMovesRemaining > 0 {
             parts.append("回环穿墙 \(wrapMovesRemaining) 步")
+        }
+        if boostMovesRemaining > 0 {
+            parts.append("喷射加速 \(boostMovesRemaining) 步")
         }
         if comboWindowRemaining > 0, comboCount >= 2 {
             parts.append("连击 x\(comboCount)")
@@ -464,10 +549,14 @@ final class SnakeGameEngine {
         let bombPoints = activeTemporaryHazards.compactMap { entry in
             entry.value.style == .bomb ? entry.key : nil
         }
+        let poopPoints = activeTemporaryHazards.compactMap { entry in
+            entry.value.style == .poop ? entry.key : nil
+        }
 
         temporaryHazards = [
             collapsePoints.isEmpty ? nil : TemporaryHazardSnapshot(points: collapsePoints, style: .collapse),
-            bombPoints.isEmpty ? nil : TemporaryHazardSnapshot(points: bombPoints, style: .bomb)
+            bombPoints.isEmpty ? nil : TemporaryHazardSnapshot(points: bombPoints, style: .bomb),
+            poopPoints.isEmpty ? nil : TemporaryHazardSnapshot(points: poopPoints, style: .poop)
         ].compactMap { $0 }
     }
 
@@ -513,12 +602,26 @@ final class SnakeGameEngine {
         rebuildTemporaryHazardSnapshot()
     }
 
+    private func armPoopResidue(at point: GridPoint) -> Bool {
+        guard !level.obstacles.contains(point) else {
+            return false
+        }
+        guard !(dynamicObstacle?.points.contains(point) ?? false) else {
+            return false
+        }
+        activeTemporaryHazards[point] = ActiveTemporaryHazard(style: .poop, remainingSteps: 9)
+        rebuildTemporaryHazardSnapshot()
+        return true
+    }
+
     private func temporaryHazardMessage(for style: TemporaryHazardStyle?) -> String {
         switch style {
         case .collapse:
             return "踩进塌陷地板了"
         case .bomb:
             return "被爆裂余波困住了"
+        case .poop:
+            return "踩到便便打滑了"
         case .none:
             return "游戏结束"
         }

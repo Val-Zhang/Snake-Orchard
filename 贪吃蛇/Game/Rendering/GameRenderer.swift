@@ -170,16 +170,16 @@ final class GameRenderer {
         statusLabel.position = CGPoint(x: 0, y: boardFrame.minY - 52)
         hintLabel.position = CGPoint(x: 0, y: boardFrame.minY - 82)
 
-        let overlayWidth = min(boardFrame.width * 0.86, 480)
-        let overlayHeight: CGFloat = 360
+        let overlayWidth = min(boardFrame.width * 0.90, 520)
+        let overlayHeight: CGFloat = 420
         let overlayRect = CGRect(x: -overlayWidth / 2, y: -overlayHeight / 2, width: overlayWidth, height: overlayHeight)
         overlayPanel.path = CGPath(roundedRect: overlayRect, cornerWidth: 20, cornerHeight: 20, transform: nil)
-        overlayTitle.position = CGPoint(x: 0, y: 126)
-        overlaySubtitle.position = CGPoint(x: 0, y: 92)
-        overlayMeta.position = CGPoint(x: 0, y: 54)
-        overlayFooter.position = CGPoint(x: 0, y: -148)
+        overlayTitle.position = CGPoint(x: 0, y: 150)
+        overlaySubtitle.position = CGPoint(x: 0, y: 116)
+        overlayMeta.position = CGPoint(x: 0, y: 78)
+        overlayFooter.position = CGPoint(x: 0, y: -184)
         for (index, node) in overlayOptionNodes.enumerated() {
-            node.position = CGPoint(x: 0, y: 12 - CGFloat(index) * 28)
+            node.position = CGPoint(x: 0, y: 18 - CGFloat(index) * 30)
         }
 
         renderBackdrop(sceneSize: sceneSize)
@@ -189,15 +189,22 @@ final class GameRenderer {
 
     func render(
         snapshot: GameSnapshot,
+        boostStatus: BoostStatusSnapshot,
         mode: SceneMode,
         progress: GameProgressSummary,
         overlayMenu: OverlayMenuState?
     ) {
-        renderSnake(snapshot.snake)
+        renderSnake(
+            snapshot.snake,
+            isSimpleModeEnabled: snapshot.isSimpleModeEnabled,
+            trainCarriages: snapshot.trainCarriages,
+            direction: snapshot.currentDirection,
+            boostStatus: boostStatus
+        )
         renderDynamicObstacles(snapshot.dynamicObstacle)
         renderTemporaryHazards(snapshot.temporaryHazards)
         renderFruit(position: snapshot.fruitPosition, fruit: snapshot.fruit, countdown: snapshot.fruitCountdown)
-        updateHUD(snapshot)
+        updateHUD(snapshot, boostStatus: boostStatus)
         updateOverlay(snapshot: snapshot, mode: mode, progress: progress, overlayMenu: overlayMenu)
     }
 
@@ -211,8 +218,12 @@ final class GameRenderer {
             showToast(text: "\(fruit.name) 消失了", color: SKColor(calibratedRed: 0.90, green: 0.78, blue: 0.38, alpha: 1.0))
         case .bombTriggered:
             showToast(text: "爆裂果实引爆周围地块", color: SKColor(calibratedRed: 1.0, green: 0.45, blue: 0.28, alpha: 1.0))
+        case .boostActivated:
+            showToast(text: "喷射加速！尾巴甩出了一团便便", color: SKColor(calibratedRed: 1.0, green: 0.83, blue: 0.34, alpha: 1.0))
         case .floorCollapsed:
             showToast(text: "地砖开始塌陷", color: SKColor(calibratedRed: 0.74, green: 0.84, blue: 1.0, alpha: 1.0))
+        case .safetyBrake:
+            showToast(text: "安全刹车发动，快换个方向", color: SKColor(calibratedRed: 1.0, green: 0.90, blue: 0.36, alpha: 1.0))
         case .gameOver:
             shakeBoard()
         case .highScoreUpdated:
@@ -264,8 +275,19 @@ final class GameRenderer {
         }
     }
 
-    private func renderSnake(_ snake: [GridPoint]) {
+    private func renderSnake(
+        _ snake: [GridPoint],
+        isSimpleModeEnabled: Bool,
+        trainCarriages: [FruitKind?],
+        direction: Direction,
+        boostStatus: BoostStatusSnapshot
+    ) {
         snakeLayer.removeAllChildren()
+
+        if isSimpleModeEnabled {
+            renderTrain(snake: snake, trainCarriages: trainCarriages, direction: direction, boostStatus: boostStatus)
+            return
+        }
 
         for (index, segment) in snake.enumerated() {
             let isHead = index == 0
@@ -285,6 +307,9 @@ final class GameRenderer {
             snakeLayer.addChild(node)
 
             if isHead {
+                if boostStatus.isReady {
+                    addBoostReadyEffect(to: node, size: cellSize * 0.94)
+                }
                 let eyeOffset = cellSize * 0.16
                 let leftEye = SKShapeNode(circleOfRadius: cellSize * 0.05)
                 leftEye.fillColor = .black
@@ -299,6 +324,238 @@ final class GameRenderer {
                 node.addChild(rightEye)
             }
         }
+    }
+
+    private func renderTrain(
+        snake: [GridPoint],
+        trainCarriages: [FruitKind?],
+        direction: Direction,
+        boostStatus: BoostStatusSnapshot
+    ) {
+        for (index, segment) in snake.enumerated() {
+            if index > 0 {
+                let previousSegment = snake[index - 1]
+                let coupler = SKShapeNode(path: couplerPath(from: point(for: previousSegment), to: point(for: segment)))
+                coupler.strokeColor = SKColor(calibratedWhite: 0.14, alpha: 0.72)
+                coupler.lineWidth = cellSize * 0.14
+                coupler.lineCap = .round
+                snakeLayer.addChild(coupler)
+            }
+
+            if index == 0 {
+                let engineNode = SKShapeNode(
+                    rectOf: CGSize(width: cellSize * 0.94, height: cellSize * 0.78),
+                    cornerRadius: cellSize * 0.16
+                )
+                engineNode.position = point(for: segment)
+                engineNode.zRotation = direction.rotationAngle
+                engineNode.fillColor = SKColor(calibratedRed: 0.92, green: 0.26, blue: 0.22, alpha: 1.0)
+                engineNode.strokeColor = SKColor(calibratedWhite: 0.08, alpha: 0.28)
+                engineNode.lineWidth = 1.2
+                snakeLayer.addChild(engineNode)
+
+                if boostStatus.isReady {
+                    addBoostReadyEffect(to: engineNode, size: cellSize)
+                }
+
+                let cabin = SKShapeNode(
+                    rectOf: CGSize(width: cellSize * 0.34, height: cellSize * 0.30),
+                    cornerRadius: cellSize * 0.08
+                )
+                cabin.position = CGPoint(x: cellSize * 0.08, y: cellSize * 0.16)
+                cabin.fillColor = SKColor(calibratedRed: 1.0, green: 0.90, blue: 0.66, alpha: 1.0)
+                cabin.strokeColor = .clear
+                engineNode.addChild(cabin)
+
+                let chimney = SKShapeNode(
+                    rectOf: CGSize(width: cellSize * 0.12, height: cellSize * 0.20),
+                    cornerRadius: cellSize * 0.04
+                )
+                chimney.position = CGPoint(x: -cellSize * 0.16, y: cellSize * 0.20)
+                chimney.fillColor = SKColor(calibratedWhite: 0.18, alpha: 1.0)
+                chimney.strokeColor = .clear
+                engineNode.addChild(chimney)
+
+                addTrainWheels(to: engineNode, xOffsets: [-0.20, 0.18])
+                continue
+            }
+
+            let carriageKind = index - 1 < trainCarriages.count ? trainCarriages[index - 1] : nil
+            let carriageNode = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.82, height: cellSize * 0.64),
+                cornerRadius: cellSize * 0.14
+            )
+            carriageNode.position = point(for: segment)
+            carriageNode.zRotation = carriageRotation(for: snake, at: index)
+            carriageNode.fillColor = carriageKind?.color ?? SKColor(calibratedRed: 0.24, green: 0.56, blue: 0.88, alpha: 1.0)
+            carriageNode.strokeColor = SKColor(calibratedWhite: 0.08, alpha: 0.22)
+            carriageNode.lineWidth = 1.0
+            snakeLayer.addChild(carriageNode)
+
+            decorateTrainCarriage(carriageNode, kind: carriageKind)
+
+            let roof = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.72, height: cellSize * 0.14),
+                cornerRadius: cellSize * 0.08
+            )
+            roof.position = CGPoint(x: 0, y: cellSize * 0.20)
+            roof.fillColor = SKColor(calibratedWhite: 1.0, alpha: 0.20)
+            roof.strokeColor = .clear
+            carriageNode.addChild(roof)
+
+            addTrainWheels(to: carriageNode, xOffsets: [-0.18, 0.18])
+
+            let label = SKLabelNode(fontNamed: carriageKind == nil ? "AvenirNext-Bold" : "AppleColorEmoji")
+            label.fontSize = cellSize * 0.28
+            label.verticalAlignmentMode = .center
+            label.horizontalAlignmentMode = .center
+            label.fontColor = SKColor(calibratedWhite: 1.0, alpha: 0.92)
+            label.text = carriageKind?.symbol ?? "C"
+            label.position = CGPoint(x: 0, y: -cellSize * 0.02)
+            carriageNode.addChild(label)
+        }
+    }
+
+    private func addBoostReadyEffect(to node: SKNode, size: CGFloat) {
+        let aura = SKShapeNode(circleOfRadius: size * 0.58)
+        aura.strokeColor = SKColor(calibratedRed: 1.0, green: 0.86, blue: 0.34, alpha: 0.95)
+        aura.fillColor = SKColor(calibratedRed: 1.0, green: 0.86, blue: 0.34, alpha: 0.10)
+        aura.lineWidth = 2
+        aura.zPosition = -1
+        node.addChild(aura)
+        aura.run(.repeatForever(.sequence([
+            .group([
+                .scale(to: 1.14, duration: 0.22),
+                .fadeAlpha(to: 0.42, duration: 0.22)
+            ]),
+            .group([
+                .scale(to: 0.94, duration: 0.22),
+                .fadeAlpha(to: 0.92, duration: 0.22)
+            ])
+        ])))
+
+        let sparkle = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        sparkle.fontSize = size * 0.34
+        sparkle.fontColor = SKColor(calibratedRed: 1.0, green: 0.92, blue: 0.46, alpha: 0.96)
+        sparkle.text = "⚡"
+        sparkle.position = CGPoint(x: 0, y: size * 0.54)
+        node.addChild(sparkle)
+        sparkle.run(.repeatForever(.sequence([
+            .group([
+                .moveBy(x: 0, y: size * 0.08, duration: 0.28),
+                .fadeAlpha(to: 0.68, duration: 0.28)
+            ]),
+            .group([
+                .moveBy(x: 0, y: -size * 0.08, duration: 0.28),
+                .fadeAlpha(to: 1.0, duration: 0.28)
+            ])
+        ])))
+    }
+
+    private func addTrainWheels(to node: SKNode, xOffsets: [CGFloat]) {
+        for xOffset in xOffsets {
+            let wheel = SKShapeNode(circleOfRadius: cellSize * 0.07)
+            wheel.fillColor = SKColor(calibratedWhite: 0.14, alpha: 1.0)
+            wheel.strokeColor = SKColor(calibratedWhite: 0.75, alpha: 0.32)
+            wheel.lineWidth = 1
+            wheel.position = CGPoint(x: cellSize * xOffset, y: -cellSize * 0.24)
+            node.addChild(wheel)
+        }
+    }
+
+    private func decorateTrainCarriage(_ carriageNode: SKShapeNode, kind: FruitKind?) {
+        switch kind {
+        case .banana:
+            let stripe = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.62, height: cellSize * 0.12),
+                cornerRadius: cellSize * 0.06
+            )
+            stripe.position = CGPoint(x: 0, y: 0)
+            stripe.fillColor = SKColor(calibratedRed: 0.58, green: 0.42, blue: 0.10, alpha: 0.28)
+            stripe.strokeColor = .clear
+            carriageNode.addChild(stripe)
+        case .apple:
+            let leaf = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.14, height: cellSize * 0.08),
+                cornerRadius: cellSize * 0.04
+            )
+            leaf.position = CGPoint(x: cellSize * 0.12, y: cellSize * 0.10)
+            leaf.zRotation = .pi / 5
+            leaf.fillColor = SKColor(calibratedRed: 0.30, green: 0.72, blue: 0.24, alpha: 0.96)
+            leaf.strokeColor = .clear
+            carriageNode.addChild(leaf)
+        case .pomelo:
+            let star = SKShapeNode(path: starPath(radius: cellSize * 0.12))
+            star.position = CGPoint(x: 0, y: 0)
+            star.fillColor = SKColor(calibratedWhite: 1.0, alpha: 0.34)
+            star.strokeColor = .clear
+            carriageNode.addChild(star)
+        case .watermelon:
+            let rind = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.66, height: cellSize * 0.10),
+                cornerRadius: cellSize * 0.05
+            )
+            rind.position = CGPoint(x: 0, y: -cellSize * 0.10)
+            rind.fillColor = SKColor(calibratedRed: 0.08, green: 0.42, blue: 0.16, alpha: 0.88)
+            rind.strokeColor = .clear
+            carriageNode.addChild(rind)
+        case .peach:
+            let blush = SKShapeNode(circleOfRadius: cellSize * 0.09)
+            blush.position = CGPoint(x: cellSize * 0.10, y: -cellSize * 0.02)
+            blush.fillColor = SKColor(calibratedRed: 1.0, green: 0.82, blue: 0.86, alpha: 0.42)
+            blush.strokeColor = .clear
+            carriageNode.addChild(blush)
+        case nil:
+            let window = SKShapeNode(
+                rectOf: CGSize(width: cellSize * 0.18, height: cellSize * 0.14),
+                cornerRadius: cellSize * 0.04
+            )
+            window.position = CGPoint(x: 0, y: cellSize * 0.02)
+            window.fillColor = SKColor(calibratedWhite: 1.0, alpha: 0.28)
+            window.strokeColor = .clear
+            carriageNode.addChild(window)
+        }
+    }
+
+    private func carriageRotation(for snake: [GridPoint], at index: Int) -> CGFloat {
+        let current = snake[index]
+        let previous = snake[max(0, index - 1)]
+        let next = index + 1 < snake.count ? snake[index + 1] : previous
+
+        let dx = previous.x != current.x ? previous.x - current.x : current.x - next.x
+        let dy = previous.y != current.y ? previous.y - current.y : current.y - next.y
+
+        if abs(dx) >= abs(dy) {
+            return 0
+        }
+        return .pi / 2
+    }
+
+    private func couplerPath(from start: CGPoint, to end: CGPoint) -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: start)
+        path.addLine(to: end)
+        return path
+    }
+
+    private func starPath(radius: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        let points = 5
+        let innerRadius = radius * 0.48
+
+        for index in 0 ..< points * 2 {
+            let angle = CGFloat(index) * .pi / CGFloat(points) - .pi / 2
+            let currentRadius = index.isMultiple(of: 2) ? radius : innerRadius
+            let point = CGPoint(x: cos(angle) * currentRadius, y: sin(angle) * currentRadius)
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+
+        path.closeSubpath()
+        return path
     }
 
     private func renderDynamicObstacles(_ snapshot: DynamicObstacleSnapshot?) {
@@ -403,6 +660,21 @@ final class GameRenderer {
                             .fadeAlpha(to: 0.58, duration: 0.16)
                         ])
                     ])))
+                case .poop:
+                    node.fillColor = SKColor(calibratedRed: 0.48, green: 0.30, blue: 0.18, alpha: 0.88)
+                    node.strokeColor = SKColor(calibratedRed: 0.78, green: 0.62, blue: 0.42, alpha: 0.82)
+                    node.lineWidth = 1.2
+                    let label = SKLabelNode(fontNamed: "AppleColorEmoji")
+                    label.fontSize = cellSize * 0.46
+                    label.verticalAlignmentMode = .center
+                    label.horizontalAlignmentMode = .center
+                    label.text = "💩"
+                    label.position = CGPoint(x: 0, y: -cellSize * 0.03)
+                    node.addChild(label)
+                    node.run(.repeatForever(.sequence([
+                        .fadeAlpha(to: 0.56, duration: 0.22),
+                        .fadeAlpha(to: 0.92, duration: 0.22)
+                    ])))
                 }
 
                 temporaryHazardLayer.addChild(node)
@@ -475,9 +747,20 @@ final class GameRenderer {
         }
     }
 
-    private func updateHUD(_ snapshot: GameSnapshot) {
-        levelLabel.text = "关卡: \(snapshot.level.name)"
-        modifierLabel.text = "词条: \(snapshot.modifier.badge) \(snapshot.modifier.title)"
+    private func updateHUD(_ snapshot: GameSnapshot, boostStatus: BoostStatusSnapshot) {
+        let modeText = snapshot.isSimpleModeEnabled ? " · 极简模式" : ""
+        levelLabel.text = "关卡: \(snapshot.level.name)\(modeText)"
+        let boostHint: String
+        if snapshot.boostMovesRemaining > 0 {
+            boostHint = "   加速喷射中"
+        } else if !boostStatus.hasEnoughLength {
+            boostHint = "   加速需至少 4 节"
+        } else if boostStatus.isReady {
+            boostHint = boostStatus.isHeld ? "   加速触发中" : "   加速 Ready"
+        } else {
+            boostHint = String(format: "   聚能 %.0f%%", boostStatus.chargeProgress * 100)
+        }
+        modifierLabel.text = "词条: \(snapshot.modifier.badge) \(snapshot.modifier.title)\(boostHint)"
         let comboText = snapshot.comboCount >= 2 ? "   连击 x\(snapshot.comboCount) +\(snapshot.comboBonus)" : ""
         scoreLabel.text = "得分: \(snapshot.score)   最高: \(snapshot.highScore)   长度: \(snapshot.snake.count)\(comboText)"
 
@@ -516,7 +799,7 @@ final class GameRenderer {
         case .playing:
             overlayLayer.alpha = 0
             overlayLayer.isHidden = true
-        case .mainMenu, .achievements, .help, .settings, .gameOver:
+        case .mainMenu, .achievements, .codex, .help, .settings, .gameOver:
             guard let overlayMenu else {
                 overlayLayer.alpha = 0
                 overlayLayer.isHidden = true
@@ -539,7 +822,8 @@ final class GameRenderer {
             overlayLayer.isHidden = false
             overlayLayer.alpha = 1
             overlayTitle.text = "贪吃蛇"
-            overlaySubtitle.text = "关卡: \(snapshot.level.name)  ·  词条: \(snapshot.modifier.title)"
+            let modeText = snapshot.isSimpleModeEnabled ? "  ·  极简模式" : ""
+            overlaySubtitle.text = "关卡: \(snapshot.level.name)  ·  词条: \(snapshot.modifier.title)\(modeText)"
             let mechanic = snapshot.mechanicText.map { "\n机关: \($0)" } ?? ""
             overlayMeta.text = "任务: \(snapshot.mission.title) - \(snapshot.mission.detail)\n已解锁成就: \(progress.unlockedAchievements)/\(progress.totalAchievements)\n空格开始  ·  P 暂停  ·  方向键 / WASD 移动\(mechanic)"
         case .paused:
@@ -575,25 +859,33 @@ final class GameRenderer {
     }
 
     private func renderAchievementBadges(items: [OverlayMenuItem]) {
-        let columns = 2
-        let badgeWidth: CGFloat = 180
-        let badgeHeight: CGFloat = 78
-        let spacingX: CGFloat = 16
-        let spacingY: CGFloat = 14
-        let startX = -(badgeWidth + spacingX) / 2
-        let startY: CGFloat = 8
+        let panelWidth = max(overlayPanel.frame.width, 280)
+        let columns: Int
+        if items.count > 8 {
+            columns = panelWidth >= 260 ? 3 : 2
+        } else {
+            columns = panelWidth >= 430 ? 3 : 2
+        }
+        let horizontalPadding: CGFloat = panelWidth < 340 ? 18 : 24
+        let spacingX: CGFloat = columns == 3 ? 10 : (panelWidth < 340 ? 10 : 14)
+        let spacingY: CGFloat = columns == 3 ? 8 : (items.count > 8 ? 10 : 12)
+        let badgeWidth = min((panelWidth - horizontalPadding * 2 - spacingX * CGFloat(columns - 1)) / CGFloat(columns), 182)
+        let badgeHeight: CGFloat = columns == 3 ? 46 : (items.count > 8 ? 56 : 66)
+        let startY: CGFloat = columns == 3 ? 28 : 22
 
         for (index, item) in items.enumerated() {
-            let column = index % columns
             let row = index / columns
-            let originX = startX + CGFloat(column) * (badgeWidth + spacingX)
-            let originY = startY - CGFloat(row) * (badgeHeight + spacingY)
+            let positionInRow = index % columns
+            let rowItemCount = min(columns, items.count - row * columns)
+            let rowWidth = CGFloat(rowItemCount) * badgeWidth + CGFloat(max(0, rowItemCount - 1)) * spacingX
+            let x = -rowWidth / 2 + badgeWidth / 2 + CGFloat(positionInRow) * (badgeWidth + spacingX)
+            let y = startY - CGFloat(row) * (badgeHeight + spacingY)
 
             let card = SKShapeNode(
                 rectOf: CGSize(width: badgeWidth, height: badgeHeight),
-                cornerRadius: 16
+                cornerRadius: 14
             )
-            card.position = CGPoint(x: originX + badgeWidth / 2, y: originY)
+            card.position = CGPoint(x: x, y: y)
             card.fillColor = item.isDimmed
                 ? SKColor(calibratedWhite: 0.16, alpha: 0.84)
                 : currentPalette.accent.withAlphaComponent(0.16)
@@ -604,19 +896,19 @@ final class GameRenderer {
             overlayBadgeLayer.addChild(card)
 
             let iconNode = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            iconNode.fontSize = 26
+            iconNode.fontSize = badgeWidth < 130 ? 22 : 24
             iconNode.text = item.icon ?? "★"
-            iconNode.position = CGPoint(x: -badgeWidth * 0.33, y: 8)
+            iconNode.position = CGPoint(x: -badgeWidth * 0.33, y: 6)
             iconNode.fontColor = item.isDimmed
                 ? SKColor(calibratedWhite: 0.80, alpha: 0.46)
                 : currentPalette.accent
             card.addChild(iconNode)
 
             let titleNode = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            titleNode.fontSize = 15
+            titleNode.fontSize = badgeWidth < 130 ? 12 : 14
             titleNode.horizontalAlignmentMode = .left
             titleNode.verticalAlignmentMode = .center
-            titleNode.position = CGPoint(x: -badgeWidth * 0.18, y: 14)
+            titleNode.position = CGPoint(x: -badgeWidth * 0.16, y: 12)
             titleNode.text = item.title
             titleNode.fontColor = item.isDimmed
                 ? SKColor(calibratedWhite: 0.88, alpha: 0.52)
@@ -624,20 +916,20 @@ final class GameRenderer {
             card.addChild(titleNode)
 
             let subtitleNode = SKLabelNode(fontNamed: "AvenirNext-Regular")
-            subtitleNode.fontSize = 11
+            subtitleNode.fontSize = badgeWidth < 130 ? 9 : 10
             subtitleNode.horizontalAlignmentMode = .left
             subtitleNode.verticalAlignmentMode = .center
-            subtitleNode.position = CGPoint(x: -badgeWidth * 0.18, y: -4)
+            subtitleNode.position = CGPoint(x: -badgeWidth * 0.16, y: -2)
             subtitleNode.text = item.subtitle
             subtitleNode.fontColor = SKColor(calibratedWhite: 0.90, alpha: item.isDimmed ? 0.38 : 0.72)
             card.addChild(subtitleNode)
 
             if let badge = item.badge {
                 let badgeNode = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
-                badgeNode.fontSize = 10
+                badgeNode.fontSize = badgeWidth < 130 ? 8.5 : 9.5
                 badgeNode.horizontalAlignmentMode = .left
                 badgeNode.verticalAlignmentMode = .center
-                badgeNode.position = CGPoint(x: -badgeWidth * 0.18, y: -22)
+                badgeNode.position = CGPoint(x: -badgeWidth * 0.16, y: -17)
                 badgeNode.text = badge
                 badgeNode.fontColor = item.isDimmed
                     ? SKColor(calibratedWhite: 0.76, alpha: 0.42)
@@ -777,6 +1069,49 @@ final class GameRenderer {
     }
 
     private func palette(for level: LevelDefinition) -> LevelPalette {
+        if level.dynamicMechanic == nil {
+            switch level.name {
+            case "草地":
+                return LevelPalette(
+                    background: SKColor(calibratedRed: 0.83, green: 0.93, blue: 0.84, alpha: 1.0),
+                    board: SKColor(calibratedRed: 0.94, green: 0.98, blue: 0.91, alpha: 1.0),
+                    obstacle: SKColor(calibratedRed: 0.40, green: 0.62, blue: 0.34, alpha: 1.0),
+                    snakeHead: SKColor(calibratedRed: 0.95, green: 0.36, blue: 0.28, alpha: 1.0),
+                    snakeBody: SKColor(calibratedRed: 0.36, green: 0.72, blue: 0.50, alpha: 1.0),
+                    accent: SKColor(calibratedRed: 0.98, green: 0.75, blue: 0.28, alpha: 1.0)
+                )
+            case "门廊":
+                return LevelPalette(
+                    background: SKColor(calibratedRed: 0.95, green: 0.89, blue: 0.78, alpha: 1.0),
+                    board: SKColor(calibratedRed: 0.98, green: 0.95, blue: 0.87, alpha: 1.0),
+                    obstacle: SKColor(calibratedRed: 0.62, green: 0.45, blue: 0.28, alpha: 1.0),
+                    snakeHead: SKColor(calibratedRed: 0.88, green: 0.30, blue: 0.22, alpha: 1.0),
+                    snakeBody: SKColor(calibratedRed: 0.31, green: 0.62, blue: 0.82, alpha: 1.0),
+                    accent: SKColor(calibratedRed: 0.92, green: 0.62, blue: 0.24, alpha: 1.0)
+                )
+            case "双塔":
+                return LevelPalette(
+                    background: SKColor(calibratedRed: 0.84, green: 0.89, blue: 0.98, alpha: 1.0),
+                    board: SKColor(calibratedRed: 0.90, green: 0.95, blue: 1.0, alpha: 1.0),
+                    obstacle: SKColor(calibratedRed: 0.34, green: 0.50, blue: 0.77, alpha: 1.0),
+                    snakeHead: SKColor(calibratedRed: 0.98, green: 0.55, blue: 0.32, alpha: 1.0),
+                    snakeBody: SKColor(calibratedRed: 0.42, green: 0.78, blue: 0.86, alpha: 1.0),
+                    accent: SKColor(calibratedRed: 0.98, green: 0.80, blue: 0.38, alpha: 1.0)
+                )
+            case "斗兽场":
+                return LevelPalette(
+                    background: SKColor(calibratedRed: 0.96, green: 0.86, blue: 0.76, alpha: 1.0),
+                    board: SKColor(calibratedRed: 0.99, green: 0.93, blue: 0.84, alpha: 1.0),
+                    obstacle: SKColor(calibratedRed: 0.68, green: 0.44, blue: 0.25, alpha: 1.0),
+                    snakeHead: SKColor(calibratedRed: 0.86, green: 0.28, blue: 0.26, alpha: 1.0),
+                    snakeBody: SKColor(calibratedRed: 0.88, green: 0.61, blue: 0.26, alpha: 1.0),
+                    accent: SKColor(calibratedRed: 0.70, green: 0.31, blue: 0.24, alpha: 1.0)
+                )
+            default:
+                break
+            }
+        }
+
         switch level.dynamicMechanic {
         case .sweeper:
             return LevelPalette(
