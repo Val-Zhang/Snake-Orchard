@@ -259,6 +259,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Snake Orchard";
+				INFOPLIST_KEY_CFBundleName = "Snake Orchard";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -268,9 +270,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				INFOPLIST_KEY_CFBundleDisplayName = "Snake Orchard";
-				INFOPLIST_KEY_CFBundleName = "Snake Orchard";
-				PRODUCT_BUNDLE_IDENTIFIER = "pinglan.zw.snakeorchard";
+				PRODUCT_BUNDLE_IDENTIFIER = pinglan.zw.snakeorchard;
 				PRODUCT_NAME = "Snake Orchard";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -295,6 +295,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Snake Orchard";
+				INFOPLIST_KEY_CFBundleName = "Snake Orchard";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -304,9 +306,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				INFOPLIST_KEY_CFBundleDisplayName = "Snake Orchard";
-				INFOPLIST_KEY_CFBundleName = "Snake Orchard";
-				PRODUCT_BUNDLE_IDENTIFIER = "pinglan.zw.snakeorchard";
+				PRODUCT_BUNDLE_IDENTIFIER = pinglan.zw.snakeorchard;
 				PRODUCT_NAME = "Snake Orchard";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

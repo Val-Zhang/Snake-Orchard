@@ -18,7 +18,8 @@ struct LevelFactory {
             rows: rows,
             tickDuration: 0.18,
             obstacles: [],
-            dynamicMechanic: nil
+            dynamicMechanic: nil,
+            hasCollapsingTiles: false
         )
 
         let gateway = LevelDefinition(
@@ -30,7 +31,8 @@ struct LevelFactory {
                 line(fromX: 6, toX: 13, y: 4),
                 line(fromX: 6, toX: 13, y: 9)
             ].flatMap { $0 }.filter { $0.x != 9 && $0.x != 10 }),
-            dynamicMechanic: nil
+            dynamicMechanic: nil,
+            hasCollapsingTiles: false
         )
 
         let towers = LevelDefinition(
@@ -42,7 +44,8 @@ struct LevelFactory {
                 line(fromY: 2, toY: 11, x: 5),
                 line(fromY: 2, toY: 11, x: 14)
             ].flatMap { $0 }.filter { $0.y != 6 && $0.y != 7 }),
-            dynamicMechanic: nil
+            dynamicMechanic: nil,
+            hasCollapsingTiles: false
         )
 
         let arena = LevelDefinition(
@@ -54,7 +57,8 @@ struct LevelFactory {
                 rectangleBorder(x: 6, y: 3, width: 8, height: 8)
                     .filter { !($0.x == 9 || $0.x == 10) || !($0.y == 3 || $0.y == 10) }
             ),
-            dynamicMechanic: nil
+            dynamicMechanic: nil,
+            hasCollapsingTiles: false
         )
 
         let zigzag = LevelDefinition(
@@ -67,7 +71,8 @@ struct LevelFactory {
                 line(fromX: 10, toX: 17, y: 6) +
                 line(fromX: 2, toX: 9, y: 9)
             ),
-            dynamicMechanic: nil
+            dynamicMechanic: nil,
+            hasCollapsingTiles: false
         )
 
         let sweeper = LevelDefinition(
@@ -83,7 +88,8 @@ struct LevelFactory {
             ),
             dynamicMechanic: .sweeper(
                 SweeperDefinition(row: 6, minX: 4, maxX: 15, length: 4)
-            )
+            ),
+            hasCollapsingTiles: false
         )
 
         let pulseGate = LevelDefinition(
@@ -111,10 +117,62 @@ struct LevelFactory {
                     closedDuration: 4,
                     openDuration: 3
                 )
-            )
+            ),
+            hasCollapsingTiles: false
         )
 
-        return [empty, gateway, towers, arena, zigzag, sweeper, pulseGate].randomElement() ?? empty
+        let rotor = LevelDefinition(
+            name: "风车庭院",
+            columns: columns,
+            rows: rows,
+            tickDuration: 0.15,
+            obstacles: Set(
+                rectangleBorder(x: 2, y: 2, width: 16, height: 10)
+                    .filter { !($0.x == 9 || $0.x == 10) || !($0.y == 2 || $0.y == 11) }
+            ),
+            dynamicMechanic: .rotor(
+                RotorDefinition(center: GridPoint(x: 10, y: 6), armLength: 3, holdTicks: 2)
+            ),
+            hasCollapsingTiles: false
+        )
+
+        let crusher = LevelDefinition(
+            name: "石壁夹道",
+            columns: columns,
+            rows: rows,
+            tickDuration: 0.15,
+            obstacles: Set(
+                line(fromY: 1, toY: 12, x: 3) +
+                line(fromY: 1, toY: 12, x: 16) +
+                line(fromX: 4, toX: 15, y: 1) +
+                line(fromX: 4, toX: 15, y: 12)
+            ),
+            dynamicMechanic: .crusher(
+                CrusherDefinition(minY: 3, maxY: 10, fromX: 6, toX: 13)
+            ),
+            hasCollapsingTiles: false
+        )
+
+        let footbridge = LevelDefinition(
+            name: "浮桥",
+            columns: columns,
+            rows: rows,
+            tickDuration: 0.16,
+            obstacles: Set(
+                line(fromX: 1, toX: 18, y: 2) +
+                line(fromX: 1, toX: 18, y: 11) +
+                line(fromY: 3, toY: 10, x: 1) +
+                line(fromY: 3, toY: 10, x: 18) +
+                line(fromX: 4, toX: 15, y: 6)
+            ).subtracting([
+                GridPoint(x: 9, y: 6),
+                GridPoint(x: 10, y: 6)
+            ]),
+            dynamicMechanic: nil,
+            hasCollapsingTiles: true
+        )
+
+        return [empty, gateway, towers, arena, zigzag, sweeper, pulseGate, rotor, crusher, footbridge].randomElement() ?? empty
     }
 
     private func line(fromX start: Int, toX end: Int, y: Int) -> [GridPoint] {

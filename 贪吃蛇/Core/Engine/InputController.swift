@@ -11,6 +11,7 @@ enum GameInputAction {
     case changeDirection(Direction)
     case primaryAction
     case togglePause
+    case secondaryAction
 }
 
 struct GameInputController {
@@ -18,8 +19,10 @@ struct GameInputController {
         switch event.keyCode {
         case 49:
             return .primaryAction
-        case 35, 53:
+        case 35:
             return .togglePause
+        case 53:
+            return .secondaryAction
         case 123:
             return .changeDirection(.left)
         case 124:
@@ -46,6 +49,8 @@ struct GameInputController {
             return .primaryAction
         case "p":
             return .togglePause
+        case "m":
+            return .secondaryAction
         default:
             return nil
         }
