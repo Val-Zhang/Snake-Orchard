@@ -223,123 +223,372 @@ func drawStaff(in rect: CGRect) {
     ring.stroke()
 }
 
-func drawFigure(
-    center: CGPoint,
-    scale: CGFloat,
-    bodyColor: NSColor,
-    hairColor: NSColor,
-    outline: NSColor,
-    accessory: String
-) {
-    let headRect = CGRect(
-        x: center.x - scale * 0.12,
-        y: center.y + scale * 0.10,
-        width: scale * 0.24,
-        height: scale * 0.24
-    )
-    color(249, 214, 187).setFill()
-    NSBezierPath(ovalIn: headRect).fill()
+func fillCircle(center: CGPoint, radius: CGFloat, fill: NSColor) {
+    fill.setFill()
+    NSBezierPath(ovalIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)).fill()
+}
 
-    let hairRect = CGRect(
-        x: headRect.minX - scale * 0.02,
-        y: headRect.midY,
-        width: headRect.width + scale * 0.04,
-        height: headRect.height * 0.70
+func strokePath(_ path: NSBezierPath, color: NSColor, width: CGFloat) {
+    color.setStroke()
+    path.lineWidth = width
+    path.lineCapStyle = .round
+    path.lineJoinStyle = .round
+    path.stroke()
+}
+
+func drawEye(at center: CGPoint, size: CGFloat) {
+    fillCircle(center: center, radius: size, fill: color(71, 47, 34))
+}
+
+func drawSmile(center: CGPoint, width: CGFloat) {
+    let smile = NSBezierPath()
+    smile.move(to: CGPoint(x: center.x - width * 0.5, y: center.y))
+    smile.curve(
+        to: CGPoint(x: center.x + width * 0.5, y: center.y),
+        controlPoint1: CGPoint(x: center.x - width * 0.2, y: center.y - width * 0.35),
+        controlPoint2: CGPoint(x: center.x + width * 0.2, y: center.y - width * 0.35)
     )
-    let hair = NSBezierPath(roundedRect: hairRect, xRadius: scale * 0.08, yRadius: scale * 0.08)
-    hairColor.setFill()
+    strokePath(smile, color: color(139, 89, 70), width: width * 0.12)
+}
+
+func drawCape(in rect: CGRect, fill: NSColor) {
+    let cape = NSBezierPath()
+    cape.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+    cape.line(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.18))
+    cape.curve(
+        to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.18),
+        controlPoint1: CGPoint(x: rect.minX + rect.width * 0.24, y: rect.minY - rect.height * 0.08),
+        controlPoint2: CGPoint(x: rect.maxX - rect.width * 0.24, y: rect.minY - rect.height * 0.08)
+    )
+    cape.close()
+    fill.setFill()
+    cape.fill()
+}
+
+func drawCastle(in rect: CGRect) {
+    let base = roundedRect(rect, radius: rect.width * 0.08)
+    color(124, 105, 103, 0.22).setFill()
+    base.fill()
+
+    let towerWidth = rect.width * 0.22
+    let towerRects = [
+        CGRect(x: rect.minX + rect.width * 0.06, y: rect.minY + rect.height * 0.12, width: towerWidth, height: rect.height * 0.58),
+        CGRect(x: rect.midX - towerWidth * 0.5, y: rect.minY + rect.height * 0.18, width: towerWidth, height: rect.height * 0.52),
+        CGRect(x: rect.maxX - rect.width * 0.06 - towerWidth, y: rect.minY + rect.height * 0.12, width: towerWidth, height: rect.height * 0.58)
+    ]
+    for tower in towerRects {
+        drawRoundedBody(tower, fill: color(125, 108, 120, 0.84), stroke: color(102, 82, 90, 0.8), radius: rect.width * 0.03)
+        for notch in 0 ..< 3 {
+            let notchRect = CGRect(
+                x: tower.minX + CGFloat(notch) * tower.width / 3.0,
+                y: tower.maxY - rect.height * 0.10,
+                width: tower.width * 0.22,
+                height: rect.height * 0.08
+            )
+            color(250, 244, 235).setFill()
+            notchRect.fill()
+        }
+    }
+
+    let gate = NSBezierPath(roundedRect: CGRect(
+        x: rect.midX - rect.width * 0.12,
+        y: rect.minY + rect.height * 0.12,
+        width: rect.width * 0.24,
+        height: rect.height * 0.34
+    ), xRadius: rect.width * 0.08, yRadius: rect.width * 0.08)
+    color(88, 72, 76).setFill()
+    gate.fill()
+}
+
+func drawBook(in rect: CGRect) {
+    let cover = NSBezierPath(roundedRect: rect, xRadius: rect.width * 0.18, yRadius: rect.width * 0.18)
+    color(153, 107, 79).setFill()
+    cover.fill()
+    strokePath(cover, color: color(120, 82, 59), width: rect.width * 0.08)
+
+    let page = CGRect(x: rect.minX + rect.width * 0.16, y: rect.minY + rect.height * 0.14, width: rect.width * 0.68, height: rect.height * 0.70)
+    color(246, 238, 220).setFill()
+    NSBezierPath(roundedRect: page, xRadius: rect.width * 0.08, yRadius: rect.width * 0.08).fill()
+    fillCircle(center: CGPoint(x: rect.midX, y: rect.midY), radius: rect.width * 0.12, fill: color(236, 184, 101))
+}
+
+func drawPotion(in rect: CGRect) {
+    let neck = CGRect(x: rect.midX - rect.width * 0.10, y: rect.maxY - rect.height * 0.28, width: rect.width * 0.20, height: rect.height * 0.18)
+    drawRoundedBody(neck, fill: color(226, 215, 205), stroke: color(154, 117, 90), radius: rect.width * 0.06)
+    let flask = NSBezierPath()
+    flask.move(to: CGPoint(x: rect.midX - rect.width * 0.18, y: rect.maxY - rect.height * 0.30))
+    flask.line(to: CGPoint(x: rect.midX - rect.width * 0.26, y: rect.minY + rect.height * 0.24))
+    flask.curve(
+        to: CGPoint(x: rect.midX + rect.width * 0.26, y: rect.minY + rect.height * 0.24),
+        controlPoint1: CGPoint(x: rect.midX - rect.width * 0.18, y: rect.minY + rect.height * 0.02),
+        controlPoint2: CGPoint(x: rect.midX + rect.width * 0.18, y: rect.minY + rect.height * 0.02)
+    )
+    flask.line(to: CGPoint(x: rect.midX + rect.width * 0.18, y: rect.maxY - rect.height * 0.30))
+    flask.close()
+    color(244, 246, 250, 0.92).setFill()
+    flask.fill()
+    strokePath(flask, color: color(154, 117, 90), width: rect.width * 0.06)
+
+    let liquid = NSBezierPath()
+    liquid.move(to: CGPoint(x: rect.midX - rect.width * 0.20, y: rect.minY + rect.height * 0.30))
+    liquid.curve(
+        to: CGPoint(x: rect.midX + rect.width * 0.20, y: rect.minY + rect.height * 0.30),
+        controlPoint1: CGPoint(x: rect.midX - rect.width * 0.12, y: rect.minY + rect.height * 0.36),
+        controlPoint2: CGPoint(x: rect.midX + rect.width * 0.12, y: rect.minY + rect.height * 0.24)
+    )
+    liquid.line(to: CGPoint(x: rect.midX + rect.width * 0.22, y: rect.minY + rect.height * 0.18))
+    liquid.curve(
+        to: CGPoint(x: rect.midX - rect.width * 0.22, y: rect.minY + rect.height * 0.18),
+        controlPoint1: CGPoint(x: rect.midX + rect.width * 0.12, y: rect.minY + rect.height * 0.05),
+        controlPoint2: CGPoint(x: rect.midX - rect.width * 0.12, y: rect.minY + rect.height * 0.05)
+    )
+    liquid.close()
+    color(153, 87, 182, 0.92).setFill()
+    liquid.fill()
+}
+
+func drawFather(in rect: CGRect) {
+    let outline = color(135, 90, 67)
+    drawCape(
+        in: CGRect(x: rect.minX + rect.width * 0.04, y: rect.minY + rect.height * 0.12, width: rect.width * 0.54, height: rect.height * 0.46),
+        fill: color(225, 214, 201)
+    )
+    let torso = CGRect(x: rect.minX + rect.width * 0.16, y: rect.minY + rect.height * 0.16, width: rect.width * 0.38, height: rect.height * 0.42)
+    drawRoundedBody(torso, fill: color(239, 231, 220), stroke: outline, radius: rect.width * 0.08)
+
+    let armor = NSBezierPath(roundedRect: CGRect(
+        x: torso.minX + rect.width * 0.05,
+        y: torso.minY + rect.height * 0.16,
+        width: torso.width - rect.width * 0.10,
+        height: torso.height * 0.42
+    ), xRadius: rect.width * 0.05, yRadius: rect.width * 0.05)
+    color(217, 222, 228).setFill()
+    armor.fill()
+    strokePath(armor, color: color(141, 120, 108), width: rect.width * 0.015)
+
+    let belt = CGRect(x: torso.minX + rect.width * 0.04, y: torso.minY + rect.height * 0.11, width: torso.width - rect.width * 0.08, height: rect.height * 0.05)
+    drawRoundedBody(belt, fill: color(148, 106, 74), stroke: outline, radius: rect.width * 0.02)
+    fillCircle(center: CGPoint(x: belt.midX, y: belt.midY), radius: rect.width * 0.028, fill: color(227, 184, 117))
+
+    let headCenter = CGPoint(x: torso.midX, y: torso.maxY + rect.height * 0.10)
+    fillCircle(center: headCenter, radius: rect.width * 0.12, fill: color(248, 214, 190))
+
+    let hair = NSBezierPath()
+    hair.move(to: CGPoint(x: headCenter.x - rect.width * 0.12, y: headCenter.y + rect.width * 0.00))
+    hair.curve(
+        to: CGPoint(x: headCenter.x + rect.width * 0.12, y: headCenter.y + rect.width * 0.01),
+        controlPoint1: CGPoint(x: headCenter.x - rect.width * 0.10, y: headCenter.y + rect.width * 0.16),
+        controlPoint2: CGPoint(x: headCenter.x + rect.width * 0.09, y: headCenter.y + rect.width * 0.17)
+    )
+    hair.line(to: CGPoint(x: headCenter.x + rect.width * 0.10, y: headCenter.y + rect.width * 0.10))
+    hair.line(to: CGPoint(x: headCenter.x - rect.width * 0.10, y: headCenter.y + rect.width * 0.10))
+    hair.close()
+    color(120, 72, 47).setFill()
     hair.fill()
 
-    let bodyRect = CGRect(
-        x: center.x - scale * 0.16,
-        y: center.y - scale * 0.16,
-        width: scale * 0.32,
-        height: scale * 0.32
+    let beard = NSBezierPath()
+    beard.move(to: CGPoint(x: headCenter.x - rect.width * 0.08, y: headCenter.y - rect.width * 0.01))
+    beard.curve(
+        to: CGPoint(x: headCenter.x + rect.width * 0.08, y: headCenter.y - rect.width * 0.01),
+        controlPoint1: CGPoint(x: headCenter.x - rect.width * 0.06, y: headCenter.y - rect.width * 0.13),
+        controlPoint2: CGPoint(x: headCenter.x + rect.width * 0.06, y: headCenter.y - rect.width * 0.13)
     )
-    drawRoundedBody(bodyRect, fill: bodyColor, stroke: outline, radius: scale * 0.10)
+    beard.line(to: CGPoint(x: headCenter.x + rect.width * 0.06, y: headCenter.y + rect.width * 0.02))
+    beard.line(to: CGPoint(x: headCenter.x - rect.width * 0.06, y: headCenter.y + rect.width * 0.02))
+    beard.close()
+    color(98, 59, 39).setFill()
+    beard.fill()
+
+    drawEye(at: CGPoint(x: headCenter.x - rect.width * 0.035, y: headCenter.y + rect.width * 0.02), size: rect.width * 0.010)
+    drawEye(at: CGPoint(x: headCenter.x + rect.width * 0.035, y: headCenter.y + rect.width * 0.02), size: rect.width * 0.010)
+    drawSmile(center: CGPoint(x: headCenter.x, y: headCenter.y - rect.width * 0.03), width: rect.width * 0.05)
+
+    let arm = NSBezierPath()
+    arm.move(to: CGPoint(x: torso.minX + rect.width * 0.05, y: torso.midY + rect.height * 0.05))
+    arm.line(to: CGPoint(x: torso.minX - rect.width * 0.08, y: torso.midY - rect.height * 0.10))
+    strokePath(arm, color: outline, width: rect.width * 0.06)
+
+    drawSword(in: CGRect(
+        x: rect.minX - rect.width * 0.08,
+        y: rect.minY + rect.height * 0.14,
+        width: rect.width * 0.26,
+        height: rect.height * 0.56
+    ))
+}
+
+func drawChild(in rect: CGRect) {
+    let outline = color(138, 96, 70)
+    let torso = CGRect(x: rect.midX - rect.width * 0.18, y: rect.minY + rect.height * 0.12, width: rect.width * 0.36, height: rect.height * 0.32)
+    drawRoundedBody(torso, fill: color(231, 217, 191), stroke: outline, radius: rect.width * 0.08)
+
+    let vest = NSBezierPath(roundedRect: CGRect(
+        x: torso.minX + rect.width * 0.03,
+        y: torso.minY + rect.height * 0.06,
+        width: torso.width - rect.width * 0.06,
+        height: torso.height * 0.78
+    ), xRadius: rect.width * 0.05, yRadius: rect.width * 0.05)
+    color(162, 115, 86).setFill()
+    vest.fill()
+
+    let shirt = NSBezierPath(roundedRect: CGRect(
+        x: torso.midX - rect.width * 0.07,
+        y: torso.minY + rect.height * 0.06,
+        width: rect.width * 0.14,
+        height: torso.height * 0.72
+    ), xRadius: rect.width * 0.04, yRadius: rect.width * 0.04)
+    color(244, 235, 220).setFill()
+    shirt.fill()
+
+    let headCenter = CGPoint(x: rect.midX, y: torso.maxY + rect.height * 0.09)
+    fillCircle(center: headCenter, radius: rect.width * 0.11, fill: color(250, 216, 188))
+
+    let hair = NSBezierPath()
+    hair.move(to: CGPoint(x: headCenter.x - rect.width * 0.11, y: headCenter.y + rect.width * 0.00))
+    hair.curve(
+        to: CGPoint(x: headCenter.x + rect.width * 0.11, y: headCenter.y + rect.width * 0.02),
+        controlPoint1: CGPoint(x: headCenter.x - rect.width * 0.09, y: headCenter.y + rect.width * 0.12),
+        controlPoint2: CGPoint(x: headCenter.x + rect.width * 0.08, y: headCenter.y + rect.width * 0.14)
+    )
+    hair.line(to: CGPoint(x: headCenter.x + rect.width * 0.05, y: headCenter.y + rect.width * 0.12))
+    hair.line(to: CGPoint(x: headCenter.x - rect.width * 0.07, y: headCenter.y + rect.width * 0.10))
+    hair.close()
+    color(121, 77, 46).setFill()
+    hair.fill()
+
+    drawEye(at: CGPoint(x: headCenter.x - rect.width * 0.032, y: headCenter.y + rect.width * 0.02), size: rect.width * 0.010)
+    drawEye(at: CGPoint(x: headCenter.x + rect.width * 0.032, y: headCenter.y + rect.width * 0.02), size: rect.width * 0.010)
+    drawSmile(center: CGPoint(x: headCenter.x, y: headCenter.y - rect.width * 0.03), width: rect.width * 0.05)
+    fillCircle(center: CGPoint(x: headCenter.x - rect.width * 0.058, y: headCenter.y - rect.width * 0.005), radius: rect.width * 0.012, fill: color(239, 168, 152))
+    fillCircle(center: CGPoint(x: headCenter.x + rect.width * 0.058, y: headCenter.y - rect.width * 0.005), radius: rect.width * 0.012, fill: color(239, 168, 152))
 
     let armLeft = NSBezierPath()
-    armLeft.move(to: CGPoint(x: bodyRect.minX + scale * 0.04, y: bodyRect.midY + scale * 0.04))
-    armLeft.line(to: CGPoint(x: bodyRect.minX - scale * 0.10, y: bodyRect.midY - scale * 0.08))
-    armLeft.lineWidth = scale * 0.07
-    armLeft.lineCapStyle = .round
-    outline.setStroke()
-    armLeft.stroke()
+    armLeft.move(to: CGPoint(x: torso.minX + rect.width * 0.04, y: torso.midY + rect.height * 0.03))
+    armLeft.line(to: CGPoint(x: torso.minX - rect.width * 0.09, y: torso.midY - rect.height * 0.06))
+    strokePath(armLeft, color: outline, width: rect.width * 0.05)
 
     let armRight = NSBezierPath()
-    armRight.move(to: CGPoint(x: bodyRect.maxX - scale * 0.04, y: bodyRect.midY + scale * 0.02))
-    armRight.line(to: CGPoint(x: bodyRect.maxX + scale * 0.11, y: bodyRect.midY - scale * 0.12))
-    armRight.lineWidth = scale * 0.07
-    armRight.lineCapStyle = .round
-    outline.setStroke()
-    armRight.stroke()
+    armRight.move(to: CGPoint(x: torso.maxX - rect.width * 0.04, y: torso.midY + rect.height * 0.02))
+    armRight.line(to: CGPoint(x: torso.maxX + rect.width * 0.09, y: torso.midY - rect.height * 0.10))
+    strokePath(armRight, color: outline, width: rect.width * 0.05)
 
-    let leftEye = NSBezierPath(ovalIn: CGRect(
-        x: headRect.minX + scale * 0.06,
-        y: headRect.minY + scale * 0.12,
-        width: scale * 0.025,
-        height: scale * 0.025
+    drawSword(in: CGRect(
+        x: rect.midX + rect.width * 0.06,
+        y: rect.minY + rect.height * 0.17,
+        width: rect.width * 0.18,
+        height: rect.height * 0.34
     ))
-    let rightEye = NSBezierPath(ovalIn: CGRect(
-        x: headRect.maxX - scale * 0.085,
-        y: headRect.minY + scale * 0.12,
-        width: scale * 0.025,
-        height: scale * 0.025
-    ))
-    NSColor.black.setFill()
-    leftEye.fill()
-    rightEye.fill()
+}
 
-    let smile = NSBezierPath()
-    smile.move(to: CGPoint(x: headRect.midX - scale * 0.035, y: headRect.minY + scale * 0.07))
-    smile.curve(
-        to: CGPoint(x: headRect.midX + scale * 0.035, y: headRect.minY + scale * 0.07),
-        controlPoint1: CGPoint(x: headRect.midX - scale * 0.018, y: headRect.minY + scale * 0.02),
-        controlPoint2: CGPoint(x: headRect.midX + scale * 0.018, y: headRect.minY + scale * 0.02)
+func drawMother(in rect: CGRect) {
+    let outline = color(142, 101, 74)
+    let dress = NSBezierPath()
+    dress.move(to: CGPoint(x: rect.midX, y: rect.maxY - rect.height * 0.08))
+    dress.line(to: CGPoint(x: rect.minX + rect.width * 0.12, y: rect.minY + rect.height * 0.10))
+    dress.curve(
+        to: CGPoint(x: rect.maxX - rect.width * 0.12, y: rect.minY + rect.height * 0.10),
+        controlPoint1: CGPoint(x: rect.midX - rect.width * 0.10, y: rect.minY),
+        controlPoint2: CGPoint(x: rect.midX + rect.width * 0.10, y: rect.minY)
     )
-    smile.lineWidth = scale * 0.018
-    smile.lineCapStyle = .round
-    color(132, 83, 67).setStroke()
-    smile.stroke()
+    dress.close()
+    color(211, 228, 208).setFill()
+    dress.fill()
+    strokePath(dress, color: outline, width: rect.width * 0.02)
 
-    switch accessory {
-    case "swordLarge":
-        drawSword(in: CGRect(x: center.x - scale * 0.44, y: center.y - scale * 0.06, width: scale * 0.28, height: scale * 0.52))
-    case "swordSmall":
-        drawSword(in: CGRect(x: center.x + scale * 0.08, y: center.y - scale * 0.02, width: scale * 0.18, height: scale * 0.34))
-    case "staff":
-        drawStaff(in: CGRect(x: center.x + scale * 0.12, y: center.y - scale * 0.10, width: scale * 0.18, height: scale * 0.42))
-    default:
-        break
+    let shoulder = NSBezierPath(roundedRect: CGRect(
+        x: rect.midX - rect.width * 0.14,
+        y: rect.minY + rect.height * 0.26,
+        width: rect.width * 0.28,
+        height: rect.height * 0.16
+    ), xRadius: rect.width * 0.06, yRadius: rect.width * 0.06)
+    color(224, 237, 223).setFill()
+    shoulder.fill()
+
+    let headCenter = CGPoint(x: rect.midX, y: rect.maxY - rect.height * 0.02)
+    fillCircle(center: headCenter, radius: rect.width * 0.11, fill: color(250, 216, 190))
+
+    let hair = NSBezierPath()
+    hair.move(to: CGPoint(x: headCenter.x - rect.width * 0.11, y: headCenter.y + rect.width * 0.00))
+    hair.curve(
+        to: CGPoint(x: headCenter.x + rect.width * 0.11, y: headCenter.y + rect.width * 0.00),
+        controlPoint1: CGPoint(x: headCenter.x - rect.width * 0.09, y: headCenter.y + rect.width * 0.12),
+        controlPoint2: CGPoint(x: headCenter.x + rect.width * 0.09, y: headCenter.y + rect.width * 0.12)
+    )
+    hair.line(to: CGPoint(x: headCenter.x + rect.width * 0.08, y: headCenter.y + rect.width * 0.10))
+    hair.line(to: CGPoint(x: headCenter.x - rect.width * 0.08, y: headCenter.y + rect.width * 0.10))
+    hair.close()
+    color(171, 111, 77).setFill()
+    hair.fill()
+
+    let braid = NSBezierPath()
+    braid.move(to: CGPoint(x: headCenter.x + rect.width * 0.05, y: headCenter.y - rect.width * 0.02))
+    braid.curve(
+        to: CGPoint(x: headCenter.x + rect.width * 0.11, y: headCenter.y - rect.height * 0.28),
+        controlPoint1: CGPoint(x: headCenter.x + rect.width * 0.13, y: headCenter.y - rect.height * 0.08),
+        controlPoint2: CGPoint(x: headCenter.x + rect.width * 0.10, y: headCenter.y - rect.height * 0.22)
+    )
+    strokePath(braid, color: color(168, 108, 76), width: rect.width * 0.045)
+
+    for bead in 0 ..< 3 {
+        fillCircle(
+            center: CGPoint(x: headCenter.x + rect.width * (0.075 + CGFloat(bead) * 0.012), y: headCenter.y - rect.height * (0.10 + CGFloat(bead) * 0.07)),
+            radius: rect.width * 0.020,
+            fill: color(185, 122, 84)
+        )
     }
+
+    drawEye(at: CGPoint(x: headCenter.x - rect.width * 0.032, y: headCenter.y + rect.width * 0.02), size: rect.width * 0.010)
+    drawEye(at: CGPoint(x: headCenter.x + rect.width * 0.032, y: headCenter.y + rect.width * 0.02), size: rect.width * 0.010)
+    drawSmile(center: CGPoint(x: headCenter.x, y: headCenter.y - rect.width * 0.03), width: rect.width * 0.05)
+
+    drawStaff(in: CGRect(
+        x: rect.maxX - rect.width * 0.16,
+        y: rect.minY + rect.height * 0.02,
+        width: rect.width * 0.18,
+        height: rect.height * 0.54
+    ))
+}
+
+func drawFamilyProps(in rect: CGRect) {
+    drawCastle(in: CGRect(
+        x: rect.minX + rect.width * 0.05,
+        y: rect.midY + rect.height * 0.04,
+        width: rect.width * 0.20,
+        height: rect.height * 0.24
+    ))
+    drawBook(in: CGRect(
+        x: rect.minX + rect.width * 0.12,
+        y: rect.minY + rect.height * 0.12,
+        width: rect.width * 0.08,
+        height: rect.height * 0.10
+    ))
+    drawPotion(in: CGRect(
+        x: rect.maxX - rect.width * 0.20,
+        y: rect.minY + rect.height * 0.10,
+        width: rect.width * 0.10,
+        height: rect.height * 0.13
+    ))
 }
 
 func drawFamily(in rect: CGRect) {
-    let outline = color(128, 89, 63)
-    drawFigure(
-        center: CGPoint(x: rect.midX - rect.width * 0.16, y: rect.midY - rect.height * 0.02),
-        scale: rect.width * 0.54,
-        bodyColor: color(242, 235, 222),
-        hairColor: color(119, 74, 51),
-        outline: outline,
-        accessory: "swordLarge"
-    )
-    drawFigure(
-        center: CGPoint(x: rect.midX, y: rect.midY - rect.height * 0.06),
-        scale: rect.width * 0.48,
-        bodyColor: color(226, 201, 170),
-        hairColor: color(111, 72, 43),
-        outline: outline,
-        accessory: "swordSmall"
-    )
-    drawFigure(
-        center: CGPoint(x: rect.midX + rect.width * 0.18, y: rect.midY - rect.height * 0.01),
-        scale: rect.width * 0.52,
-        bodyColor: color(211, 225, 203),
-        hairColor: color(150, 97, 62),
-        outline: outline,
-        accessory: "staff"
-    )
+    drawFamilyProps(in: rect)
+    drawFather(in: CGRect(
+        x: rect.minX + rect.width * 0.12,
+        y: rect.minY + rect.height * 0.22,
+        width: rect.width * 0.32,
+        height: rect.height * 0.42
+    ))
+    drawChild(in: CGRect(
+        x: rect.midX - rect.width * 0.14,
+        y: rect.minY + rect.height * 0.12,
+        width: rect.width * 0.28,
+        height: rect.height * 0.36
+    ))
+    drawMother(in: CGRect(
+        x: rect.maxX - rect.width * 0.40,
+        y: rect.minY + rect.height * 0.20,
+        width: rect.width * 0.30,
+        height: rect.height * 0.40
+    ))
 }
 
 func drawLabel(_ text: String, in rect: CGRect, fontSize: CGFloat, color fill: NSColor) {
