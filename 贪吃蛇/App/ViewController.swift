@@ -21,10 +21,12 @@ class ViewController: NSViewController {
         skView.ignoresSiblingOrder = true
         skView.showsFPS = true
         skView.showsNodeCount = true
+        view.window?.acceptsMouseMovedEvents = true
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
         view.window?.makeFirstResponder(skView)
+        view.window?.acceptsMouseMovedEvents = true
     }
 }
