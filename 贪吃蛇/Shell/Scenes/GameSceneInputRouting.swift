@@ -368,7 +368,6 @@ extension GameScene {
 
     func handleOverlayBlankClick(at location: CGPoint) {
         guard renderer.overlayContains(location) else {
-            handleSecondaryAction()
             return
         }
 
@@ -392,7 +391,7 @@ extension GameScene {
             }
             handleSecondaryAction()
         case .gameSelection, .gameConstruction, .snakeModeSelection, .battleSetup, .leaderboard, .familyOverview, .familyDetail, .achievements, .codex, .help, .settings, .gameOver, .ready:
-            handleSecondaryAction()
+            break
         case .mainMenu, .playing, .paused:
             break
         }
