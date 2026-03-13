@@ -1146,6 +1146,8 @@ struct GameSnapshot {
     let fruitCountdown: Int?
     let score: Int
     let highScore: Int
+    let remainingHitPoints: Int
+    let maxHitPoints: Int
     let fruitsEaten: Int
     let stepsSurvived: Int
     let comboCount: Int

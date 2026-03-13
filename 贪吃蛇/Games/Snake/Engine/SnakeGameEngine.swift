@@ -13,7 +13,7 @@ final class SnakeGameEngine {
         var remainingSteps: Int
     }
 
-    private let gameplayHint = "撞墙、撞障碍、撞自己都会结束；柚子一次加两节，其它水果加一节"
+    private let gameplayHint = "撞墙、撞障碍、撞自己都会先掉血；柚子一次加两节，其它水果加一节"
     private let restartHint = "按空格重新开始，本次关卡会重新随机"
 
     private(set) var level: LevelDefinition
@@ -30,6 +30,8 @@ final class SnakeGameEngine {
     private(set) var fruit: FruitDefinition?
     private(set) var score = 0
     private(set) var highScore = 0
+    private(set) var remainingHitPoints = 2
+    private(set) var maxHitPoints = 2
     private(set) var fruitsEaten = 0
     private(set) var isGameOver = false
     private(set) var isSimpleModeEnabled = false
@@ -48,6 +50,8 @@ final class SnakeGameEngine {
     private var comboWindowRemaining = 0
     private var lastComboBonus = 0
     private var endMessage: String?
+    private var transientStatusText: String?
+    private var awaitingDirectionChangeAfterCollision = false
     private var mechanicTick = 0
     private var userSpeedMultiplier = SpeedPreset.standard.tickMultiplier
     private var activeTemporaryHazards: [GridPoint: ActiveTemporaryHazard] = [:]
@@ -97,13 +101,15 @@ final class SnakeGameEngine {
             fruitCountdown: fruitCountdownRemaining,
             score: score,
             highScore: highScore,
+            remainingHitPoints: remainingHitPoints,
+            maxHitPoints: maxHitPoints,
             fruitsEaten: fruitsEaten,
             stepsSurvived: runStats.stepsSurvived,
             comboCount: comboCount,
             comboBonus: lastComboBonus,
             boostMovesRemaining: boostMovesRemaining,
             isGameOver: isGameOver,
-            statusText: isGameOver ? (endMessage ?? "游戏结束") : "方向键 / WASD 控制",
+            statusText: isGameOver ? (endMessage ?? "游戏结束") : (transientStatusText ?? "方向键 / WASD 控制"),
             hintText: isGameOver ? restartHint : currentGameplayHint,
             activeEffectText: activeEffectText,
             mechanicText: level.dynamicMechanic?.statusText(at: mechanicTick)
@@ -115,6 +121,7 @@ final class SnakeGameEngine {
         modifier: RunModifier,
         mission: MissionDefinition,
         highScore: Int,
+        hitPoints: Int = 2,
         isSimpleModeEnabled: Bool = false,
         isManualStepModeEnabled: Bool = false,
         dailyChallenge: DailyChallengeDefinition? = nil
@@ -123,12 +130,15 @@ final class SnakeGameEngine {
         self.modifier = modifier
         self.mission = mission
         self.highScore = highScore
+        self.maxHitPoints = min(max(hitPoints, 1), 9)
+        self.remainingHitPoints = self.maxHitPoints
         self.isSimpleModeEnabled = isSimpleModeEnabled
         self.isManualStepModeEnabled = isSimpleModeEnabled && isManualStepModeEnabled
         self.dailyChallenge = dailyChallenge
         childSafetyBrakeAvailable = isSimpleModeEnabled
         direction = .right
         pendingDirection = nil
+        awaitingDirectionChangeAfterCollision = false
         pendingCarriages = []
         score = 0
         fruitsEaten = 0
@@ -142,6 +152,7 @@ final class SnakeGameEngine {
         comboWindowRemaining = 0
         lastComboBonus = 0
         endMessage = nil
+        transientStatusText = nil
         mechanicTick = 0
         runStats = GameRunStats()
         dynamicObstacle = level.dynamicMechanic?.snapshot(at: mechanicTick)
@@ -207,7 +218,16 @@ final class SnakeGameEngine {
 
         var events: [GameEvent] = []
 
-        if let pendingDirection, !pendingDirection.isOpposite(to: direction) {
+        if awaitingDirectionChangeAfterCollision {
+            guard let pendingDirection,
+                  pendingDirection != direction,
+                  !pendingDirection.isOpposite(to: direction) else {
+                return events
+            }
+            direction = pendingDirection
+            awaitingDirectionChangeAfterCollision = false
+            transientStatusText = nil
+        } else if let pendingDirection, !pendingDirection.isOpposite(to: direction) {
             direction = pendingDirection
         }
         pendingDirection = nil
@@ -235,17 +255,23 @@ final class SnakeGameEngine {
                 childSafetyBrakeAvailable = false
                 slowMovesRemaining = max(slowMovesRemaining, 10)
                 pendingDirection = nil
+                awaitingDirectionChangeAfterCollision = true
+                transientStatusText = "安全刹车触发，挡下这次碰撞，换个方向继续"
                 events.append(.safetyBrake)
                 return events
             }
-            if hitTemporaryHazard {
-                endGame(message: temporaryHazardMessage(for: activeTemporaryHazards[nextHead]?.style))
-            } else {
-                endGame(message: "游戏结束")
+            let collisionMessage = hitTemporaryHazard
+                ? temporaryHazardMessage(for: activeTemporaryHazards[nextHead]?.style)
+                : "撞到了"
+            if absorbHit(message: collisionMessage) {
+                return events
             }
+            endGame(message: collisionMessage)
             events.append(.gameOver)
             return events
         }
+
+        transientStatusText = nil
 
         snake.insert(nextHead, at: 0)
 
@@ -340,12 +366,19 @@ final class SnakeGameEngine {
 
         let newDynamicBlocked = Set(dynamicObstacle?.points ?? [])
         if snake.contains(where: { newDynamicBlocked.contains($0) }) {
+            if absorbHit(message: "被机关夹住了") {
+                return events
+            }
             endGame(message: "被机关夹住了")
             events.append(.gameOver)
             return events
         }
         if let collidedHazardPoint = snake.first(where: { activeTemporaryHazards[$0] != nil }) {
-            endGame(message: temporaryHazardMessage(for: activeTemporaryHazards[collidedHazardPoint]?.style))
+            let message = temporaryHazardMessage(for: activeTemporaryHazards[collidedHazardPoint]?.style)
+            if absorbHit(message: message) {
+                return events
+            }
+            endGame(message: message)
             events.append(.gameOver)
             return events
         }
@@ -397,22 +430,29 @@ final class SnakeGameEngine {
         )
     }
 
-    private func makeStartingSnake(in level: LevelDefinition) -> [GridPoint] {
+    private func makeStartingSnake(in level: LevelDefinition, preferredLength: Int = 3) -> [GridPoint] {
         let dynamicBlocked = Set(dynamicObstacle?.points ?? [])
+        let temporaryBlocked = Set(activeTemporaryHazards.keys)
         let orderedRows = (0 ..< level.rows).sorted { lhs, rhs in
             abs(lhs - level.rows / 2) < abs(rhs - level.rows / 2)
         }
+        let targetLength = max(3, preferredLength)
 
-        for row in orderedRows {
-            for headX in 2 ..< level.columns {
-                let candidate = [
-                    GridPoint(x: headX, y: row),
-                    GridPoint(x: headX - 1, y: row),
-                    GridPoint(x: headX - 2, y: row)
-                ]
+        for length in stride(from: targetLength, through: 3, by: -1) {
+            for row in orderedRows {
+                for headX in (length - 1) ..< level.columns {
+                    let candidate = (0 ..< length).map { offset in
+                        GridPoint(x: headX - offset, y: row)
+                    }
 
-                if candidate.allSatisfy({ !level.obstacles.contains($0) && !dynamicBlocked.contains($0) }) {
-                    return candidate
+                    if candidate.allSatisfy({
+                        !level.obstacles.contains($0) &&
+                        !dynamicBlocked.contains($0) &&
+                        !temporaryBlocked.contains($0) &&
+                        $0 != deliveryStationPoint
+                    }) {
+                        return candidate
+                    }
                 }
             }
         }
@@ -427,6 +467,21 @@ final class SnakeGameEngine {
     private func endGame(message: String) {
         isGameOver = true
         endMessage = message
+    }
+
+    private func absorbHit(message: String) -> Bool {
+        guard remainingHitPoints > 1 else {
+            return false
+        }
+
+        remainingHitPoints -= 1
+        awaitingDirectionChangeAfterCollision = true
+        pendingDirection = nil
+        comboCount = 0
+        comboWindowRemaining = 0
+        lastComboBonus = 0
+        transientStatusText = "\(message)，扣 1 格血，剩余 \(heartText(current: remainingHitPoints, maximum: maxHitPoints))"
+        return true
     }
 
     private func modifiedScore(for fruit: FruitDefinition) -> Int {
@@ -550,6 +605,12 @@ final class SnakeGameEngine {
             parts.append("倒计时 \(fruitCountdownRemaining) 步")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func heartText(current: Int, maximum: Int) -> String {
+        let filled = String(repeating: "❤️", count: max(0, current))
+        let empty = String(repeating: "🤍", count: max(0, maximum - current))
+        return filled + empty
     }
 
     private func normalizedHead(from rawHead: GridPoint) -> GridPoint {

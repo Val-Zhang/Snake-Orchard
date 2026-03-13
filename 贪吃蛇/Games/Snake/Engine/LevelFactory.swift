@@ -149,8 +149,8 @@ struct LevelFactory {
             obstacles: Set(
                 line(fromY: 1, toY: 12, x: 3) +
                 line(fromY: 1, toY: 12, x: 16) +
-                line(fromX: 4, toX: 15, y: 1) +
-                line(fromX: 4, toX: 15, y: 12)
+                line(fromX: 4, toX: 15, y: 1).filter { $0.x != 9 && $0.x != 10 } +
+                line(fromX: 4, toX: 15, y: 12).filter { $0.x != 9 && $0.x != 10 }
             ),
             dynamicMechanic: .crusher(
                 CrusherDefinition(minY: 3, maxY: 10, fromX: 6, toX: 13)

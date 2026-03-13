@@ -144,6 +144,8 @@ enum GameScenePresentationBuilder {
             return "\(settings.visualTheme.symbol) \(settings.visualTheme.title) · \(settings.visualTheme.detail)\n\(settings.visualTheme.unlockHint) · 已解锁 \(unlockedThemeCount)/\(totalThemeCount)"
         case .familyMember:
             return "\(currentMemberSymbol) \(currentMemberName) · \(settings.familyMember.detail)\n当前绑定模式：\(currentPlayMode.title)。左右切换角色槽位，空格编辑当前昵称。"
+        case .familyHitPoints:
+            return "\(currentMemberSymbol) \(currentMemberName) 当前血量 \(settings.hitPointHearts(for: settings.familyMember))。\n每撞一次墙、障碍、自己或危险区都会先扣 1 格 ❤️，原地停下等你换方向；归零才结束。左右调整当前角色的默认血量。"
         case .characterDefinition:
             return "进入当前角色的定义入口。后面扩展虚拟头像、角色档案和更多角色能力时，会继续复用这条链路。"
         case .familyAvatar:

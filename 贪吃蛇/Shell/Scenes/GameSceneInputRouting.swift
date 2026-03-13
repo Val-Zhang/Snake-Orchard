@@ -445,6 +445,10 @@ extension GameScene {
             audioController.playConfirm()
             syncAudioMode()
         case .gameSelection:
+            guard confirmExitApplication() else {
+                renderCurrent()
+                return
+            }
             NSApplication.shared.terminate(nil)
         case .snakeModeSelection:
             mode = .gameSelection
@@ -500,6 +504,10 @@ extension GameScene {
             audioController.playConfirm()
             syncAudioMode()
         case .mainMenu:
+            guard confirmReturnToHome() else {
+                renderCurrent()
+                return
+            }
             mode = .gameSelection
             audioController.playConfirm()
             syncAudioMode()

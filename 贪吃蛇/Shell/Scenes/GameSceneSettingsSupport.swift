@@ -29,6 +29,8 @@ extension GameScene {
             adjustSpeedPreset(step: 1)
         case .familyMember:
             renameFamilyMember(settings.familyMember)
+        case .familyHitPoints:
+            adjustFamilyHitPoints(step: 1)
         case .characterDefinition:
             openFamilyDetail(for: settings.familyMember)
         case .familyAvatar:
@@ -67,6 +69,8 @@ extension GameScene {
             adjustSpeedPreset(step: step)
         case .familyMember:
             adjustFamilyMember(step: step)
+        case .familyHitPoints:
+            adjustFamilyHitPoints(step: step)
         case .characterDefinition:
             break
         case .familyAvatar:
@@ -137,6 +141,15 @@ extension GameScene {
                     return nil
                 }
                 return (member, playMode)
+            }
+        )
+        normalizedSettings.familyHitPoints = Dictionary(
+            uniqueKeysWithValues: FamilyMember.allCases.compactMap { member in
+                let hitPoints = min(max(normalizedSettings.familyHitPoints[member] ?? 2, 1), 9)
+                guard hitPoints != 2 else {
+                    return nil
+                }
+                return (member, hitPoints)
             }
         )
         let currentPlayMode = normalizedSettings.playMode(for: normalizedSettings.familyMember)
@@ -234,6 +247,26 @@ extension GameScene {
         settings.familyAvatars[member] = avatars[wrappedIndex(currentIndex + step, count: avatars.count)]
         persistSettings()
         audioController.playNavigate()
+        renderCurrent()
+    }
+
+    private func adjustFamilyHitPoints(step: Int) {
+        let member = settings.familyMember
+        let currentHitPoints = settings.hitPoints(for: member)
+        let nextHitPoints = min(max(currentHitPoints + step, 1), 9)
+        guard nextHitPoints != currentHitPoints else {
+            return
+        }
+        if nextHitPoints == 2 {
+            settings.familyHitPoints.removeValue(forKey: member)
+        } else {
+            settings.familyHitPoints[member] = nextHitPoints
+        }
+        persistSettings()
+        audioController.playNavigate()
+        if battleSession == nil, mode != .playing, mode != .paused, mode != .gameOver {
+            preparePreview()
+        }
         renderCurrent()
     }
 

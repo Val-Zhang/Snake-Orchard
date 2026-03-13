@@ -79,6 +79,7 @@ extension GameScene {
             modifier: battleSession.currentTemplate.modifier,
             mission: battleSession.currentTemplate.mission,
             highScore: highScoreStore.highScore,
+            hitPoints: settings.hitPoints(for: battleSession.currentMember),
             isSimpleModeEnabled: currentPlayMode.isSimpleModeEnabled,
             isManualStepModeEnabled: currentPlayMode.isManualStepEnabled,
             dailyChallenge: nil

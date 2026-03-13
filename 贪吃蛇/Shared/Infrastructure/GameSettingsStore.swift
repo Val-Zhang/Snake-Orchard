@@ -22,6 +22,7 @@ final class GameSettingsStore {
         static let familyAvatars = "snake_orchard.settings.family_avatars"
         static let familyAccents = "snake_orchard.settings.family_accents"
         static let familyPlayModes = "snake_orchard.settings.family_play_modes"
+        static let familyHitPoints = "snake_orchard.settings.family_hit_points"
         static let visualTheme = "snake_orchard.settings.visual_theme"
     }
 
@@ -67,6 +68,13 @@ final class GameSettingsStore {
                 }
                 return (member, playMode)
             })
+            let storedHitPoints = defaults.dictionary(forKey: Key.familyHitPoints) as? [String: Int] ?? [:]
+            let familyHitPoints: [FamilyMember: Int] = Dictionary(uniqueKeysWithValues: FamilyMember.allCases.compactMap { member in
+                guard let hitPoints = storedHitPoints[member.rawValue] else {
+                    return nil
+                }
+                return (member, min(max(hitPoints, 1), 9))
+            })
             if familyPlayModes.isEmpty {
                 let migratedPlayMode = FamilyPlayMode.from(
                     simpleModeEnabled: storedSimpleModeEnabled,
@@ -92,6 +100,7 @@ final class GameSettingsStore {
                 familyAvatars: familyAvatars,
                 familyAccents: familyAccents,
                 familyPlayModes: familyPlayModes,
+                familyHitPoints: familyHitPoints,
                 visualTheme: VisualTheme(rawValue: defaults.string(forKey: Key.visualTheme) ?? "") ?? GameSettings.default.visualTheme
             )
         }
@@ -120,6 +129,10 @@ final class GameSettingsStore {
             defaults.set(
                 Dictionary(uniqueKeysWithValues: newValue.familyPlayModes.map { ($0.key.rawValue, $0.value.rawValue) }),
                 forKey: Key.familyPlayModes
+            )
+            defaults.set(
+                Dictionary(uniqueKeysWithValues: newValue.familyHitPoints.map { ($0.key.rawValue, min(max($0.value, 1), 9)) }),
+                forKey: Key.familyHitPoints
             )
             defaults.set(newValue.visualTheme.rawValue, forKey: Key.visualTheme)
         }

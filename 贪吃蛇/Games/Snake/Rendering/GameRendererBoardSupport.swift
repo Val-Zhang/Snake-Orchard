@@ -372,7 +372,8 @@ enum GameRendererBoardSupport {
         modifierLabel.text = "词条: \(snapshot.modifier.badge) \(snapshot.modifier.title)\(boostHint)"
 
         let comboText = snapshot.comboCount >= 2 ? "   连击 x\(snapshot.comboCount) +\(snapshot.comboBonus)" : ""
-        scoreLabel.text = "得分: \(snapshot.score)   最高: \(snapshot.highScore)   长度: \(snapshot.snake.count)\(comboText)"
+        let heartText = heartText(current: snapshot.remainingHitPoints, maximum: snapshot.maxHitPoints)
+        scoreLabel.text = "得分: \(snapshot.score)   最高: \(snapshot.highScore)   长度: \(snapshot.snake.count)   血量: \(heartText)\(comboText)"
 
         if let fruit = snapshot.fruit {
             let timerText = snapshot.fruitCountdown.map { "  ⏳\($0)" } ?? ""
@@ -436,6 +437,12 @@ enum GameRendererBoardSupport {
         }
 
         return nil
+    }
+
+    private static func heartText(current: Int, maximum: Int) -> String {
+        let filled = String(repeating: "❤️", count: max(0, current))
+        let empty = String(repeating: "🤍", count: max(0, maximum - current))
+        return filled + empty
     }
 
     static func renderBackdrop(

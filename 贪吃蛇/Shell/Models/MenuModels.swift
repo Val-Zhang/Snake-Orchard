@@ -91,6 +91,7 @@ enum SettingsOption: CaseIterable {
     case manualStepMode
     case speed
     case familyMember
+    case familyHitPoints
     case characterDefinition
     case familyAvatar
     case familyAccent
@@ -112,6 +113,8 @@ enum SettingsOption: CaseIterable {
             return "速度"
         case .familyMember:
             return "当前角色"
+        case .familyHitPoints:
+            return "血量"
         case .characterDefinition:
             return "角色定义"
         case .familyAvatar:

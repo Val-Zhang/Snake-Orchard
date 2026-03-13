@@ -527,6 +527,7 @@ struct GameSettings: Equatable {
     var familyAvatars: [FamilyMember: FamilyAvatar]
     var familyAccents: [FamilyMember: FamilyAccent]
     var familyPlayModes: [FamilyMember: FamilyPlayMode]
+    var familyHitPoints: [FamilyMember: Int]
     var visualTheme: VisualTheme
 
     func displayName(for member: FamilyMember) -> String {
@@ -547,6 +548,15 @@ struct GameSettings: Equatable {
 
     func playMode(for member: FamilyMember) -> FamilyPlayMode {
         familyPlayModes[member] ?? .standard
+    }
+
+    func hitPoints(for member: FamilyMember) -> Int {
+        let configured = familyHitPoints[member] ?? 2
+        return min(max(configured, 1), 9)
+    }
+
+    func hitPointHearts(for member: FamilyMember) -> String {
+        String(repeating: "❤️", count: hitPoints(for: member))
     }
 
     private func defaultAvatar(for member: FamilyMember) -> FamilyAvatar {
@@ -589,6 +599,7 @@ struct GameSettings: Equatable {
         familyAvatars: [:],
         familyAccents: [:],
         familyPlayModes: [:],
+        familyHitPoints: [:],
         visualTheme: .orchard
     )
 }

@@ -223,6 +223,7 @@ final class GameScene: SKScene {
             modifier: modifier,
             mission: mission,
             highScore: highScoreStore.highScore,
+            hitPoints: settings.hitPoints(for: settings.familyMember),
             isSimpleModeEnabled: challenge == nil ? settings.simpleModeEnabled : false,
             isManualStepModeEnabled: challenge == nil ? (settings.simpleModeEnabled && settings.manualStepModeEnabled) : false,
             dailyChallenge: challenge
@@ -354,11 +355,49 @@ final class GameScene: SKScene {
             settingsSelection = 0
             mode = .settings
         case .quit:
+            guard confirmReturnToHome() else {
+                renderCurrent()
+                return
+            }
             mode = .gameSelection
             gameSelectionSection = 0
             gameSelectionRoleIndex = FamilyMember.allCases.firstIndex(of: settings.familyMember) ?? 0
         }
         syncAudioMode()
+    }
+
+    func confirmReturnToHome() -> Bool {
+        confirmAction(
+            title: "确认返回主页",
+            message: "会退出当前贪吃蛇菜单，回到游戏主页。",
+            confirmTitle: "返回主页"
+        )
+    }
+
+    func confirmExitApplication() -> Bool {
+        confirmAction(
+            title: "确认退出应用",
+            message: "退出后本次窗口会关闭。",
+            confirmTitle: "退出应用"
+        )
+    }
+
+    private func confirmAction(title: String, message: String, confirmTitle: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: confirmTitle)
+        alert.addButton(withTitle: "取消")
+
+        let response: NSApplication.ModalResponse
+        if let window = view?.window {
+            response = alert.runModal()
+            window.makeFirstResponder(nil)
+        } else {
+            response = alert.runModal()
+        }
+        return response == .alertFirstButtonReturn
     }
 
     private func applyFamilyOverviewSelection() {
@@ -778,6 +817,16 @@ final class GameScene: SKScene {
                             detail: settingsDescription(for: option),
                             icon: "👨‍👩‍👧‍👦",
                             badge: currentPlayMode.title,
+                            accentColor: accent(for: settings.familyMember).color,
+                            isDimmed: false
+                        )
+                    case .familyHitPoints:
+                        return OverlayMenuItem(
+                            title: option.title,
+                            subtitle: settings.hitPointHearts(for: settings.familyMember),
+                            detail: settingsDescription(for: option),
+                            icon: "♥",
+                            badge: "当前成员",
                             accentColor: accent(for: settings.familyMember).color,
                             isDimmed: false
                         )
